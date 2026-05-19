@@ -1,0 +1,952 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>부자재 자재관리 시스템</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&family=JetBrains+Mono:wght@400;700&display=swap');
+
+  :root {
+    --bg: #0d1117;
+    --bg2: #161b22;
+    --bg3: #21262d;
+    --border: #30363d;
+    --text: #e6edf3;
+    --text2: #8b949e;
+    --accent: #58a6ff;
+    --accent2: #1f6feb;
+    --green: #3fb950;
+    --red: #f85149;
+    --yellow: #d29922;
+    --orange: #e3b341;
+    --purple: #a371f7;
+    --grade-a: #3fb950;
+    --grade-b: #58a6ff;
+    --grade-c: #8b949e;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+  body {
+    font-family: 'Noto Sans KR', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    max-width: 480px;
+    margin: 0 auto;
+    position: relative;
+  }
+
+  /* TOP NAV */
+  .nav {
+    background: var(--bg2);
+    border-bottom: 1px solid var(--border);
+    padding: 14px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky; top: 0; z-index: 100;
+  }
+  .nav-title { font-size: 15px; font-weight: 700; letter-spacing: -0.3px; }
+  .nav-title span { color: var(--accent); }
+  .nav-badge {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    background: var(--accent2);
+    color: white;
+    padding: 2px 8px;
+    border-radius: 20px;
+  }
+
+  /* TABS */
+  .tabs {
+    display: flex;
+    background: var(--bg2);
+    border-bottom: 1px solid var(--border);
+    padding: 0 8px;
+  }
+  .tab {
+    flex: 1;
+    padding: 12px 4px;
+    text-align: center;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text2);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all 0.2s;
+    user-select: none;
+  }
+  .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+  .tab-icon { font-size: 18px; display: block; margin-bottom: 2px; }
+
+  /* PAGES */
+  .page { display: none; padding: 16px; }
+  .page.active { display: block; }
+
+  /* SCAN PAGE */
+  .scan-area {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    margin-bottom: 16px;
+  }
+  #scanner-container {
+    position: relative;
+    height: 220px;
+    background: #000;
+    display: flex; align-items: center; justify-content: center;
+    overflow: hidden;
+  }
+  #scanner-container video, #scanner-container canvas {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: cover;
+  }
+  .scan-overlay {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    width: 200px; height: 80px;
+    border: 2px solid var(--accent);
+    border-radius: 6px;
+    box-shadow: 0 0 0 2000px rgba(0,0,0,0.5);
+    pointer-events: none;
+    z-index: 10;
+  }
+  .scan-line {
+    position: absolute;
+    left: 0; right: 0;
+    height: 2px;
+    background: var(--accent);
+    animation: scan 2s linear infinite;
+    box-shadow: 0 0 8px var(--accent);
+  }
+  @keyframes scan { 0% { top: 4px; } 100% { top: calc(100% - 6px); } }
+  .scan-inactive {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 220px;
+    gap: 12px;
+    color: var(--text2);
+  }
+  .scan-inactive .big-icon { font-size: 48px; }
+  .scan-inactive p { font-size: 13px; }
+
+  .scan-btn {
+    width: 100%;
+    padding: 14px;
+    background: var(--accent2);
+    color: white;
+    border: none;
+    font-family: 'Noto Sans KR', sans-serif;
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background 0.2s;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+  }
+  .scan-btn:hover { background: var(--accent); }
+  .scan-btn.stop { background: #21262d; border-top: 1px solid var(--border); }
+
+  /* MANUAL SEARCH */
+  .search-box {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 16px;
+  }
+  .search-box h3 { font-size: 13px; color: var(--text2); margin-bottom: 10px; font-weight: 500; }
+  .input-row { display: flex; gap: 8px; }
+  input[type="text"] {
+    flex: 1;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 10px 12px;
+    border-radius: 8px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 14px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  input[type="text"]:focus { border-color: var(--accent); }
+  .btn-sm {
+    padding: 10px 16px;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 8px;
+    font-family: 'Noto Sans KR', sans-serif;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+  }
+  .btn-sm:hover { border-color: var(--accent); color: var(--accent); }
+  .btn-sm.primary { background: var(--accent2); border-color: var(--accent2); color: white; }
+
+  /* RESULT CARD */
+  .result-card {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 16px;
+    animation: fadeIn 0.3s ease;
+  }
+  @keyframes fadeIn { from { opacity:0; transform: translateY(8px); } to { opacity:1; transform: translateY(0); } }
+  .result-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+  .result-name { font-size: 14px; font-weight: 700; line-height: 1.4; flex: 1; }
+  .grade-badge {
+    flex-shrink: 0;
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 900; font-size: 13px;
+  }
+  .grade-A { background: rgba(63,185,80,0.2); color: var(--grade-a); border: 1px solid var(--grade-a); }
+  .grade-B { background: rgba(88,166,255,0.2); color: var(--grade-b); border: 1px solid var(--grade-b); }
+  .grade-C { background: rgba(139,148,158,0.2); color: var(--grade-c); border: 1px solid var(--grade-c); }
+
+  .info-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+  .info-item {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 12px;
+  }
+  .info-label { font-size: 10px; color: var(--text2); margin-bottom: 3px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .info-value { font-size: 14px; font-weight: 600; }
+  .info-value.mono { font-family: 'JetBrains Mono', monospace; }
+  .info-value.red { color: var(--red); }
+  .info-value.green { color: var(--green); }
+  .info-value.yellow { color: var(--yellow); }
+
+  .location-banner {
+    background: rgba(88,166,255,0.1);
+    border: 1px solid rgba(88,166,255,0.3);
+    border-radius: 8px;
+    padding: 10px 14px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+  .location-icon { font-size: 20px; }
+  .location-text { font-size: 13px; }
+  .location-text strong { color: var(--accent); font-size: 16px; }
+
+  /* ACTION BUTTONS */
+  .action-row { display: flex; gap: 8px; }
+  .action-btn {
+    flex: 1;
+    padding: 10px;
+    border-radius: 8px;
+    border: none;
+    font-family: 'Noto Sans KR', sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+  }
+  .action-btn.in { background: rgba(63,185,80,0.15); color: var(--green); border: 1px solid rgba(63,185,80,0.4); }
+  .action-btn.out { background: rgba(248,81,73,0.15); color: var(--red); border: 1px solid rgba(248,81,73,0.4); }
+  .action-btn:hover { filter: brightness(1.2); }
+
+  /* MODAL */
+  .modal-overlay {
+    display: none;
+    position: fixed; top:0;left:0;right:0;bottom:0;
+    background: rgba(0,0,0,0.7);
+    z-index: 200;
+    align-items: flex-end;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal {
+    width: 100%;
+    max-width: 480px;
+    margin: 0 auto;
+    background: var(--bg2);
+    border-radius: 16px 16px 0 0;
+    border-top: 1px solid var(--border);
+    padding: 20px;
+    animation: slideUp 0.3s ease;
+  }
+  @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+  .modal-title { font-size: 16px; font-weight: 700; margin-bottom: 16px; }
+  .modal-input-group { margin-bottom: 14px; }
+  .modal-input-group label { font-size: 12px; color: var(--text2); display: block; margin-bottom: 6px; }
+  .modal-input-group input {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 12px;
+    border-radius: 8px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 16px;
+    outline: none;
+  }
+  .modal-input-group input:focus { border-color: var(--accent); }
+  .modal-buttons { display: flex; gap: 10px; margin-top: 16px; }
+  .modal-btn {
+    flex: 1;
+    padding: 13px;
+    border-radius: 8px;
+    border: none;
+    font-family: 'Noto Sans KR', sans-serif;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  .modal-btn.cancel { background: var(--bg3); color: var(--text2); }
+  .modal-btn.confirm-in { background: var(--green); color: #000; }
+  .modal-btn.confirm-out { background: var(--red); color: white; }
+
+  /* INVENTORY LIST */
+  .filter-row { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+  .filter-chip {
+    padding: 6px 12px;
+    border-radius: 20px;
+    border: 1px solid var(--border);
+    font-size: 12px;
+    cursor: pointer;
+    background: var(--bg3);
+    color: var(--text2);
+    transition: all 0.2s;
+    user-select: none;
+  }
+  .filter-chip.active { border-color: var(--accent); color: var(--accent); background: rgba(88,166,255,0.1); }
+  .search-input-wrap { position: relative; margin-bottom: 12px; }
+  .search-input-wrap input {
+    width: 100%;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 10px 12px 10px 36px;
+    border-radius: 8px;
+    font-family: 'Noto Sans KR', sans-serif;
+    font-size: 14px;
+    outline: none;
+  }
+  .search-input-wrap input:focus { border-color: var(--accent); }
+  .search-icon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text2); font-size: 16px; }
+
+  .item-list { display: flex; flex-direction: column; gap: 8px; }
+  .item-row {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 14px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    cursor: pointer;
+    transition: border-color 0.2s;
+  }
+  .item-row:hover { border-color: var(--accent); }
+  .item-grade-dot {
+    width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+  }
+  .dot-A { background: var(--grade-a); }
+  .dot-B { background: var(--grade-b); }
+  .dot-C { background: var(--grade-c); }
+  .item-info { flex: 1; min-width: 0; }
+  .item-name { font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .item-meta { font-size: 11px; color: var(--text2); margin-top: 2px; }
+  .item-stock {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    font-weight: 700;
+    text-align: right;
+    flex-shrink: 0;
+  }
+  .load-more {
+    text-align: center;
+    padding: 12px;
+    color: var(--text2);
+    font-size: 13px;
+    cursor: pointer;
+  }
+  .load-more:hover { color: var(--accent); }
+
+  /* DASHBOARD */
+  .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; }
+  .stat-card {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px;
+  }
+  .stat-label { font-size: 11px; color: var(--text2); margin-bottom: 6px; }
+  .stat-value { font-size: 24px; font-weight: 900; font-family: 'JetBrains Mono', monospace; }
+  .stat-value.accent { color: var(--accent); }
+  .stat-value.red { color: var(--red); }
+  .stat-value.green { color: var(--green); }
+  .stat-sub { font-size: 11px; color: var(--text2); margin-top: 4px; }
+
+  .section-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text2);
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    margin-bottom: 10px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .section-title::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  .grade-bar {
+    display: flex;
+    height: 8px;
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 8px;
+  }
+  .grade-seg { transition: width 0.5s ease; }
+
+  .history-list { display: flex; flex-direction: column; gap: 8px; }
+  .history-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-size: 12px;
+  }
+  .history-type {
+    width: 44px;
+    padding: 3px 0;
+    border-radius: 4px;
+    text-align: center;
+    font-size: 11px;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+  .history-type.in { background: rgba(63,185,80,0.2); color: var(--green); }
+  .history-type.out { background: rgba(248,81,73,0.2); color: var(--red); }
+  .history-name { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text); }
+  .history-qty { font-family: 'JetBrains Mono', monospace; font-weight: 700; flex-shrink: 0; }
+  .history-time { font-size: 10px; color: var(--text2); flex-shrink: 0; }
+
+  /* TOAST */
+  .toast {
+    position: fixed;
+    bottom: 80px;
+    left: 50%; transform: translateX(-50%);
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 20px;
+    font-size: 13px;
+    z-index: 999;
+    opacity: 0;
+    transition: opacity 0.3s;
+    white-space: nowrap;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+  }
+  .toast.show { opacity: 1; }
+  .toast.success { border-color: var(--green); color: var(--green); }
+  .toast.error { border-color: var(--red); color: var(--red); }
+
+  /* NOT FOUND */
+  .not-found {
+    text-align: center;
+    padding: 30px 16px;
+    color: var(--text2);
+  }
+  .not-found .big { font-size: 40px; margin-bottom: 8px; }
+  .not-found p { font-size: 13px; }
+
+  /* PAGINATION */
+  .pagination-info { font-size: 12px; color: var(--text2); text-align: center; margin-top: 8px; }
+</style>
+</head>
+<body>
+
+<div class="nav">
+  <div class="nav-title">📦 <span>자재관리</span> 시스템</div>
+  <div class="nav-badge" id="total-count">219개 품목</div>
+</div>
+
+<div class="tabs">
+  <div class="tab active" onclick="switchTab('scan')">
+    <span class="tab-icon">📷</span>스캔
+  </div>
+  <div class="tab" onclick="switchTab('inventory')">
+    <span class="tab-icon">📋</span>재고현황
+  </div>
+  <div class="tab" onclick="switchTab('dashboard')">
+    <span class="tab-icon">📊</span>대시보드
+  </div>
+</div>
+
+<!-- SCAN PAGE -->
+<div class="page active" id="page-scan">
+  <div class="scan-area">
+    <div id="scanner-container">
+      <div class="scan-inactive" id="scan-inactive">
+        <div class="big-icon">📷</div>
+        <p>카메라로 바코드를 스캔하세요</p>
+      </div>
+    </div>
+    <button class="scan-btn" id="scan-toggle-btn" onclick="toggleScan()">
+      📷 카메라 스캔 시작
+    </button>
+  </div>
+
+  <div class="search-box">
+    <h3>🔍 바코드 직접 입력</h3>
+    <div class="input-row">
+      <input type="text" id="barcode-input" placeholder="MAT0017" onkeydown="if(event.key==='Enter') searchBarcode()">
+      <button class="btn-sm primary" onclick="searchBarcode()">조회</button>
+    </div>
+    <div style="margin-top: 8px; display: flex; gap: 6px; flex-wrap: wrap;">
+      <button class="btn-sm" onclick="quickSearch('MAT0017')" style="font-size:11px;">MAT0017 예시</button>
+      <button class="btn-sm" onclick="quickSearch('MAT0163')" style="font-size:11px;">MAT0163 예시</button>
+      <button class="btn-sm" onclick="quickSearch('MAT0042')" style="font-size:11px;">MAT0042 예시</button>
+    </div>
+  </div>
+
+  <div id="scan-result"></div>
+</div>
+
+<!-- INVENTORY PAGE -->
+<div class="page" id="page-inventory">
+  <div class="search-input-wrap">
+    <span class="search-icon">🔍</span>
+    <input type="text" id="inv-search" placeholder="자재명 또는 거래처 검색..." oninput="renderInventory()">
+  </div>
+  <div class="filter-row" id="grade-filters">
+    <div class="filter-chip active" data-grade="ALL" onclick="setGradeFilter(this)">전체</div>
+    <div class="filter-chip" data-grade="A" onclick="setGradeFilter(this)">🟢 A등급</div>
+    <div class="filter-chip" data-grade="B" onclick="setGradeFilter(this)">🔵 B등급</div>
+    <div class="filter-chip" data-grade="C" onclick="setGradeFilter(this)">⚪ C등급</div>
+    <div class="filter-chip" data-grade="SHORTAGE" onclick="setGradeFilter(this)">🔴 부족</div>
+  </div>
+  <div class="item-list" id="item-list"></div>
+  <div class="pagination-info" id="pagination-info"></div>
+  <div class="load-more" id="load-more-btn" onclick="loadMore()">더 보기 ▼</div>
+</div>
+
+<!-- DASHBOARD PAGE -->
+<div class="page" id="page-dashboard">
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-label">총 품목 수</div>
+      <div class="stat-value accent" id="stat-total">219</div>
+      <div class="stat-sub">등록된 부자재</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">재고 부족 품목</div>
+      <div class="stat-value red" id="stat-shortage">-</div>
+      <div class="stat-sub">즉시 발주 필요</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">A등급 품목</div>
+      <div class="stat-value green" id="stat-a">-</div>
+      <div class="stat-sub">고빈도 회전 자재</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">오늘 입출고</div>
+      <div class="stat-value accent" id="stat-today">0</div>
+      <div class="stat-sub">건 처리됨</div>
+    </div>
+  </div>
+
+  <p class="section-title">ABC 등급 분포</p>
+  <div style="background: var(--bg3); border: 1px solid var(--border); border-radius: 10px; padding: 14px; margin-bottom: 16px;">
+    <div class="grade-bar" id="grade-bar"></div>
+    <div style="display:flex; gap: 16px; font-size: 12px;">
+      <span style="color: var(--grade-a);">● A등급 <span id="bar-a-pct">-</span></span>
+      <span style="color: var(--grade-b);">● B등급 <span id="bar-b-pct">-</span></span>
+      <span style="color: var(--grade-c);">● C등급 <span id="bar-c-pct">-</span></span>
+    </div>
+  </div>
+
+  <p class="section-title">Zone별 배치 현황</p>
+  <div style="background: var(--bg3); border: 1px solid var(--border); border-radius: 10px; padding: 14px; margin-bottom: 16px;">
+    <div id="zone-stats"></div>
+  </div>
+
+  <p class="section-title">입출고 이력</p>
+  <div class="history-list" id="history-list">
+    <div style="color: var(--text2); text-align: center; padding: 20px; font-size: 13px;">
+      아직 입출고 내역이 없습니다.<br>스캔 탭에서 입출고를 처리하세요.
+    </div>
+  </div>
+</div>
+
+<!-- MODALS -->
+<div class="modal-overlay" id="modal-in">
+  <div class="modal">
+    <div class="modal-title">📥 입고 처리</div>
+    <div id="modal-in-name" style="font-size: 13px; color: var(--text2); margin-bottom: 14px;"></div>
+    <div class="modal-input-group">
+      <label>입고 수량 (EA)</label>
+      <input type="number" id="modal-in-qty" placeholder="0" min="1">
+    </div>
+    <div class="modal-buttons">
+      <button class="modal-btn cancel" onclick="closeModal('modal-in')">취소</button>
+      <button class="modal-btn confirm-in" onclick="confirmIn()">✅ 입고 확인</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-out">
+  <div class="modal">
+    <div class="modal-title">📤 출고 처리</div>
+    <div id="modal-out-name" style="font-size: 13px; color: var(--text2); margin-bottom: 14px;"></div>
+    <div class="modal-input-group">
+      <label>출고 수량 (EA)</label>
+      <input type="number" id="modal-out-qty" placeholder="0" min="1">
+    </div>
+    <div class="modal-buttons">
+      <button class="modal-btn cancel" onclick="closeModal('modal-out')">취소</button>
+      <button class="modal-btn confirm-out" onclick="confirmOut()">✅ 출고 확인</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const RAW_DATA = [{"barcode":"MAT0000","name":"200mL스킨로션뚜껑_공용(흰색)_200ml_뚜껑","vendor":"차모스","category":"뚜껑","stock":-5544,"grade":"B","location":"Zone C","last_date":"2025-10-31"},{"barcode":"MAT0001","name":"200mL은펄용기_공용_200ml_용기","vendor":"차모스","category":"용기","stock":-3823,"grade":"B","location":"Zone C","last_date":"2025-10-31"},{"barcode":"MAT0002","name":"200mL은펄용기_공용_200ml_패킹","vendor":"차모스","category":"패킹","stock":2000,"grade":"C","location":"Zone A","last_date":"2025-10-31"},{"barcode":"MAT0003","name":"24파이 디스펜서 M3 검정 [200ml]_200ml_펌프","vendor":"차모스","category":"펌프","stock":-924,"grade":"B","location":"Zone C","last_date":"2025-10-28"},{"barcode":"MAT0004","name":"24파이 미세스프레이","vendor":"차모스","category":"스프레이","stock":100,"grade":"C","location":"Zone A","last_date":"2025-07-02"},{"barcode":"MAT0005","name":"33파이 알로에젤 그린펌프","vendor":"더에스제이","category":"펌프","stock":400,"grade":"C","location":"Zone A","last_date":"2025-10-27"},{"barcode":"MAT0006","name":"50g공용자용기_산양크림_판테놀크림_50g_뚜껑","vendor":"차모스","category":"뚜껑","stock":-1744,"grade":"B","location":"Zone C","last_date":"2025-11-21"},{"barcode":"MAT0007","name":"50g공용자용기_산양크림_판테놀크림_50g_리드","vendor":"차모스","category":"리드","stock":632,"grade":"B","location":"Zone C","last_date":"2025-11-21"},{"barcode":"MAT0008","name":"50g공용자용기_산양크림_판테놀크림_50g_용기","vendor":"차모스","category":"용기","stock":-3823,"grade":"C","location":"Zone A","last_date":"2025-11-21"},{"barcode":"MAT0009","name":"70ml 에센스 흰색오버캡","vendor":"강호정","category":"뚜껑","stock":260,"grade":"C","location":"Zone A","last_date":"2025-10-23"},{"barcode":"MAT0010","name":"70ml 에센스 흰색용기","vendor":"강호정","category":"용기","stock":114,"grade":"C","location":"Zone A","last_date":"2025-10-23"},{"barcode":"MAT0011","name":"BARA AT-HOME OIL TREATMENT","vendor":"사우디","category":"파우치","stock":47000,"grade":"C","location":"Zone A","last_date":"2026-02-19"},{"barcode":"MAT0012","name":"BARA AT-HOME OIL TREATMENT_내용물(45g)","vendor":"차모스","category":"내용물","stock":44100,"grade":"C","location":"Zone A","last_date":"2026-03-03"},{"barcode":"MAT0013","name":"BARA CHIN AREA CARE PATCH","vendor":"사우디","category":"파우치","stock":44000,"grade":"C","location":"Zone A","last_date":"2026-02-19"},{"barcode":"MAT0014","name":"BARA COLLAGEN FACE MASK","vendor":"사우디","category":"파우치","stock":49700,"grade":"C","location":"Zone A","last_date":"2026-02-19"},{"barcode":"MAT0015","name":"BARA SNAIL REPAIR MOISTURIZING FOOT PACK","vendor":"사우디","category":"파우치","stock":47200,"grade":"C","location":"Zone A","last_date":"2026-02-19"},{"barcode":"MAT0016","name":"BARA SNAIL REPAIR MOISTURIZING FOOT PACK_내용물(18g)","vendor":"차모스","category":"내용물","stock":46500,"grade":"C","location":"Zone A","last_date":"2026-03-03"},{"barcode":"MAT0017","name":"C&S 50ml 공용 리드","vendor":"C&S","category":"리드","stock":21000,"grade":"A","location":"Zone B","last_date":"2025-12-02"},{"barcode":"MAT0018","name":"C&S 50ml 공용 스푼","vendor":"C&S","category":"스푼","stock":21000,"grade":"A","location":"Zone B","last_date":"2025-12-02"},{"barcode":"MAT0019","name":"C&S 50ml 공용 용기","vendor":"C&S","category":"용기","stock":16000,"grade":"B","location":"Zone C","last_date":"2025-12-02"},{"barcode":"MAT0020","name":"EW9102_스판레이스 부직포","vendor":"차모스","category":"원단","stock":12,"grade":"C","location":"Zone A","last_date":"2026-01-23"},{"barcode":"MAT0021","name":"MBS크림(50g*40)아웃박스","vendor":"차모스","category":"C/T Box","stock":250,"grade":"C","location":"Zone A","last_date":"2026-02-27"},{"barcode":"MAT0022","name":"MBS크림(50g*40)인박스","vendor":"차모스","category":"C/T Box","stock":500,"grade":"C","location":"Zone A","last_date":"2026-02-27"},{"barcode":"MAT0023","name":"OPP무지봉투","vendor":"시드물","category":"OPP봉투","stock":35300,"grade":"A","location":"Zone B","last_date":"2025-12-25"},{"barcode":"MAT0024","name":"P3_단상자","vendor":"저먼유로","category":"단상자","stock":-15066,"grade":"C","location":"Zone A","last_date":"2025-08-26"},{"barcode":"MAT0025","name":"P3_단상자속지","vendor":"저먼유로","category":"속지","stock":5000,"grade":"C","location":"Zone A","last_date":"2025-08-26"},{"barcode":"MAT0026","name":"PF44T 70파이_100매 (콜라겐, 비타민)_0ml_패드","vendor":"차모스","category":"패킹","stock":100000,"grade":"A","location":"Zone B","last_date":"2025-08-18"},{"barcode":"MAT0027","name":"고삼시트마스크_단상자","vendor":"더에스제이","category":"단상자","stock":1901,"grade":"C","location":"Zone A","last_date":"2025-11-17"},{"barcode":"MAT0028","name":"그라티아수 비타하이드레이팅 12개입","vendor":"㈜제이엠코스텍","category":"C/T Box","stock":500,"grade":"C","location":"Zone A","last_date":"2026-02-25"},{"barcode":"MAT0029","name":"그라티아수 비타하이드레이팅 12입 칸막이","vendor":"㈜제이엠코스텍","category":"C/T Box","stock":500,"grade":"C","location":"Zone A","last_date":"2026-02-25"},{"barcode":"MAT0030","name":"그라티아수 알로에 수딩 젤_100g_튜브","vendor":"더에스제이","category":"튜브","stock":3054,"grade":"B","location":"Zone C","last_date":"2025-12-04"},{"barcode":"MAT0031","name":"그라티아수 알로에 젤_800g_용기","vendor":"더에스제이","category":"용기","stock":-1035,"grade":"B","location":"Zone C","last_date":"2025-09-03"},{"barcode":"MAT0032","name":"그라티아수 알로에 젤_800g_펌프","vendor":"더에스제이","category":"펌프","stock":2400,"grade":"C","location":"Zone A","last_date":"2025-09-11"},{"barcode":"MAT0033","name":"그라티아수 알로에 젤_800g_펌프캡","vendor":"더에스제이","category":"펌프캡","stock":5040,"grade":"B","location":"Zone C","last_date":"2025-09-03"},{"barcode":"MAT0034","name":"내몸은 육두구 토너_150ml_단상자","vendor":"저먼유로","category":"단상자","stock":-10066,"grade":"A","location":"Zone B","last_date":"2026-01-26"},{"barcode":"MAT0035","name":"내몸은 육두구 토너_150ml_라벨","vendor":"저먼유로","category":"라벨","stock":-10,"grade":"A","location":"Zone B","last_date":"2026-01-20"},{"barcode":"MAT0036","name":"내몸은 육두구 토너_150ml_스프레이","vendor":"저먼유로","category":"스프레이","stock":-5020,"grade":"A","location":"Zone B","last_date":"2026-01-19"},{"barcode":"MAT0037","name":"내몸은 육두구 토너_150ml_용기","vendor":"저먼유로","category":"용기","stock":-10066,"grade":"A","location":"Zone B","last_date":"2026-01-16"},{"barcode":"MAT0038","name":"내몸은 육두구 토너_55ml_단상자","vendor":"저먼유로","category":"단상자","stock":-14566,"grade":"B","location":"Zone C","last_date":"2026-01-23"},{"barcode":"MAT0039","name":"내몸은 육두구 토너_55ml_스프레이","vendor":"저먼유로","category":"스프레이","stock":-10020,"grade":"B","location":"Zone C","last_date":"2025-08-06"},{"barcode":"MAT0040","name":"내몸은 육두구 토너_55ml_용기","vendor":"저먼유로","category":"용기","stock":-15066,"grade":"B","location":"Zone C","last_date":"2026-01-22"},{"barcode":"MAT0041","name":"닥터유힐카밍마스크팩접지_텐셀40g+민자펄지","vendor":"유힐바이오","category":"접지","stock":9600,"grade":"B","location":"Zone C","last_date":"2025-07-29"},{"barcode":"MAT0042","name":"대나무숯 50g 부직포_부직포","vendor":"차모스","category":"부직포","stock":-65690,"grade":"A","location":"Zone B","last_date":"2025-10-13"},{"barcode":"MAT0043","name":"레이온 40g 부직포__부직포","vendor":"차모스","category":"부직포","stock":-55690,"grade":"A","location":"Zone B","last_date":"2025-11-17"},{"barcode":"MAT0044","name":"루벨 알로에 수딩 젤_100g_튜브","vendor":"더에스제이","category":"튜브","stock":2983,"grade":"B","location":"Zone C","last_date":"2025-12-29"},{"barcode":"MAT0045","name":"루벨 알로에 수딩젤_단상자","vendor":"더에스제이","category":"단상자","stock":-99,"grade":"C","location":"Zone A","last_date":"2025-11-17"},{"barcode":"MAT0046","name":"리오셀 40 원단 (마스크팩원단)","vendor":"차모스","category":"부직포","stock":-55690,"grade":"B","location":"Zone C","last_date":"2026-02-05"},{"barcode":"MAT0047","name":"리커버리크림 100ml_단상자","vendor":"비비야","category":"단상자","stock":923,"grade":"C","location":"Zone A","last_date":"2025-12-01"},{"barcode":"MAT0048","name":"매직오일_800ml_18개입 OutBox","vendor":"더에스제이","category":"박스","stock":300,"grade":"C","location":"Zone A","last_date":"2025-09-18"},{"barcode":"MAT0049","name":"매직오일_800ml_9개입 InBox","vendor":"더에스제이","category":"박스","stock":600,"grade":"C","location":"Zone A","last_date":"2025-09-18"},{"barcode":"MAT0050","name":"매직오일_800ml_9개입_칸막이","vendor":"더에스제이","category":"칸막이","stock":600,"grade":"C","location":"Zone A","last_date":"2025-09-18"},{"barcode":"MAT0051","name":"무인쇄 (CHA-0)","vendor":"차모스","category":"C/T Box","stock":900,"grade":"C","location":"Zone A","last_date":"2026-02-12"},{"barcode":"MAT0052","name":"무인쇄 (차모스)","vendor":"차모스","category":"C/T Box","stock":30,"grade":"C","location":"Zone A","last_date":"2025-09-29"},{"barcode":"MAT0053","name":"발팩 부직포","vendor":"차모스","category":"필름","stock":-18300,"grade":"C","location":"Zone A","last_date":"2026-01-26"},{"barcode":"MAT0054","name":"발팩필름_35g","vendor":"차모스","category":"필름","stock":-18281,"grade":"C","location":"Zone A","last_date":"2026-01-23"},{"barcode":"MAT0055","name":"불가리아_꿀피부여유마스크팩","vendor":"차모스","category":"라벨","stock":2535,"grade":"C","location":"Zone A","last_date":"2026-03-18"},{"barcode":"MAT0056","name":"불가리아_다크서클도둑아이패치","vendor":"차모스","category":"라벨","stock":4535,"grade":"B","location":"Zone C","last_date":"2025-12-16"},{"barcode":"MAT0057","name":"불가리아_달팽이리페어실크마스크팩","vendor":"차모스","category":"라벨","stock":2535,"grade":"B","location":"Zone C","last_date":"2025-12-16"},{"barcode":"MAT0058","name":"불가리아_몬스터풋필링팩","vendor":"차모스","category":"라벨","stock":10085,"grade":"B","location":"Zone C","last_date":"2025-12-16"},{"barcode":"MAT0059","name":"불가리아_비타브라이트리페어실크마스크팩","vendor":"차모스","category":"라벨","stock":2535,"grade":"B","location":"Zone C","last_date":"2025-12-16"},{"barcode":"MAT0060","name":"불가리아_스네일리페어산양유마스크팩","vendor":"차모스","category":"라벨","stock":2535,"grade":"B","location":"Zone C","last_date":"2025-12-16"},{"barcode":"MAT0061","name":"불가리아_스파클링버블마스크팩","vendor":"차모스","category":"라벨","stock":3535,"grade":"B","location":"Zone C","last_date":"2025-12-16"},{"barcode":"MAT0062","name":"불가리아_슬림브이핏턱케어패치","vendor":"차모스","category":"라벨","stock":-465,"grade":"C","location":"Zone A","last_date":"2025-12-16"},{"barcode":"MAT0063","name":"불가리아_안티링클블랙아이패치","vendor":"차모스","category":"라벨","stock":4535,"grade":"B","location":"Zone C","last_date":"2025-12-16"},{"barcode":"MAT0064","name":"불가리아_원스에브리데이리얼타임백아이크림","vendor":"차모스","category":"라벨","stock":-1465,"grade":"C","location":"Zone A","last_date":"2026-03-18"},{"barcode":"MAT0065","name":"불가리아_차모스아가시다크서클도둑아이패치","vendor":"차모스","category":"라벨","stock":1535,"grade":"C","location":"Zone A","last_date":"2026-03-18"},{"barcode":"MAT0066","name":"불가리아_차모스아가시몬스터풋필링팩","vendor":"차모스","category":"라벨","stock":6535,"grade":"C","location":"Zone A","last_date":"2026-03-18"},{"barcode":"MAT0067","name":"불가리아_차모스아가시비타브라이트리페어실크마스크팩","vendor":"차모스","category":"라벨","stock":535,"grade":"C","location":"Zone A","last_date":"2026-03-18"},{"barcode":"MAT0068","name":"불가리아_차모스아가시스네일리페어산양유마스크팩","vendor":"차모스","category":"라벨","stock":2535,"grade":"C","location":"Zone A","last_date":"2026-03-18"},{"barcode":"MAT0069","name":"불가리아_차모스아가시스네일리페어실크마스크팩","vendor":"차모스","category":"라벨","stock":5535,"grade":"C","location":"Zone A","last_date":"2026-03-18"},{"barcode":"MAT0070","name":"불가리아_차모스아가시스파클링버블마스크팩","vendor":"차모스","category":"라벨","stock":535,"grade":"C","location":"Zone A","last_date":"2026-03-18"},{"barcode":"MAT0071","name":"불가리아_차모스아가시슬림브이핏턱케어패치","vendor":"차모스","category":"라벨","stock":-1465,"grade":"C","location":"Zone A","last_date":"2026-03-18"},{"barcode":"MAT0072","name":"불가리아_차모스아가시안티링클블랙아이패치","vendor":"차모스","category":"라벨","stock":1535,"grade":"C","location":"Zone A","last_date":"2026-03-18"},{"barcode":"MAT0073","name":"불가리아_차모스아가시차콜리페어실크마스크팩","vendor":"차모스","category":"라벨","stock":535,"grade":"C","location":"Zone A","last_date":"2026-03-18"},{"barcode":"MAT0074","name":"불가리아_차모스아가시콜라겐리페어실크마스크팩","vendor":"차모스","category":"라벨","stock":4535,"grade":"C","location":"Zone A","last_date":"2026-03-18"},{"barcode":"MAT0075","name":"불가리아_차콜리페어실크마스크팩","vendor":"차모스","category":"라벨","stock":2535,"grade":"B","location":"Zone C","last_date":"2025-12-16"},{"barcode":"MAT0076","name":"불가리아_콜라겐리페어실크마스크팩","vendor":"차모스","category":"라벨","stock":6535,"grade":"B","location":"Zone C","last_date":"2025-12-16"},{"barcode":"MAT0077","name":"불가리아_히니지니59달마마스크팩","vendor":"차모스","category":"라벨","stock":-465,"grade":"B","location":"Zone C","last_date":"2026-03-18"},{"barcode":"MAT0078","name":"블랑센 병풀추출물 50 버블 클렌저_120g_단상자","vendor":"차모스","category":"단상자","stock":-13043,"grade":"C","location":"Zone A","last_date":"2025-11-21"},{"barcode":"MAT0079","name":"블랑센 병풀추출물 65 크림_100g_단상자","vendor":"차모스","category":"단상자","stock":-11043,"grade":"B","location":"Zone C","last_date":"2025-11-21"},{"barcode":"MAT0080","name":"블랑센 병풀추출물 75 에멀젼_200g_라벨","vendor":"차모스","category":"라벨","stock":-1465,"grade":"C","location":"Zone A","last_date":"2025-11-11"},{"barcode":"MAT0081","name":"블랑센 병풀추출물 버블 클렌저_용기","vendor":"차모스","category":"용기","stock":-3823,"grade":"C","location":"Zone A","last_date":"2026-02-24"},{"barcode":"MAT0082","name":"블랑센 병풀추출물 버블 클렌저_펌프","vendor":"차모스","category":"펌프","stock":2076,"grade":"C","location":"Zone A","last_date":"2026-02-24"},{"barcode":"MAT0083","name":"블랑센 어성초 맑은 소금 바디 스크럽_170g_스탠드 스파우트","vendor":"차모스","category":"스파우트","stock":51000,"grade":"C","location":"Zone A","last_date":"2026-03-10"},{"barcode":"MAT0084","name":"블랑센 어성초추출물 80 에멀젼_200g_단상자","vendor":"차모스","category":"단상자","stock":-13043,"grade":"C","location":"Zone A","last_date":"2025-11-21"},{"barcode":"MAT0085","name":"블랑센 판테놀 딥 모이스쳐 크림_50g_단상자","vendor":"차모스","category":"단상자","stock":-13043,"grade":"C","location":"Zone A","last_date":"2025-11-24"},{"barcode":"MAT0086","name":"블랑센 판테놀 딥 모이스쳐 크림_50g_라벨","vendor":"차모스","category":"라벨","stock":-1465,"grade":"C","location":"Zone A","last_date":"2025-11-11"},{"barcode":"MAT0087","name":"블랑센 판테놀 씨 90 토너_200ml_라벨","vendor":"차모스","category":"라벨","stock":-1465,"grade":"C","location":"Zone A","last_date":"2025-11-11"},{"barcode":"MAT0088","name":"블랑센 홍삼 맑은 소금 바디 스크럽_170g_스탠드 스파우트","vendor":"차모스","category":"스파우트","stock":51000,"grade":"C","location":"Zone A","last_date":"2026-03-17"},{"barcode":"MAT0089","name":"블랑센200ml공용_200ml_갈색용기","vendor":"차모스","category":"용기","stock":-6823,"grade":"C","location":"Zone A","last_date":"2025-10-29"},{"barcode":"MAT0090","name":"블랑센200ml공용_200ml_투명용기","vendor":"차모스","category":"용기","stock":-6823,"grade":"B","location":"Zone C","last_date":"2026-01-06"},{"barcode":"MAT0091","name":"블랑센200ml공용프레스캡(검정)_200ml_뚜껑","vendor":"차모스","category":"뚜껑","stock":-3544,"grade":"C","location":"Zone A","last_date":"2025-10-31"},{"barcode":"MAT0092","name":"블랑센30ml세럼_공용_30ml_구용기(펌프)","vendor":"차모스","category":"펌프","stock":2076,"grade":"C","location":"Zone A","last_date":"2025-11-11"},{"barcode":"MAT0093","name":"블랑센30ml세럼_공용_30ml_펌프","vendor":"차모스","category":"펌프","stock":2076,"grade":"C","location":"Zone A","last_date":"2025-11-11"},{"barcode":"MAT0094","name":"블레미쉬아웃수딩크림_단상자","vendor":"비비야","category":"단상자","stock":923,"grade":"C","location":"Zone A","last_date":"2025-11-24"},{"barcode":"MAT0095","name":"비마트 (한번에해결)","vendor":"비마트","category":"C/T Box","stock":300,"grade":"C","location":"Zone A","last_date":"2026-01-23"},{"barcode":"MAT0096","name":"비마트 십자패드","vendor":"비마트","category":"패드","stock":2000,"grade":"C","location":"Zone A","last_date":"2026-01-23"},{"barcode":"MAT0097","name":"샴푸_1,000ml_파우치_부자재","vendor":"비마트","category":"파우치","stock":-2056,"grade":"A","location":"Zone B","last_date":"2026-03-18"},{"barcode":"MAT0098","name":"셀롱퍼펙트미스트세럼단상자","vendor":"저먼유로","category":"단상자","stock":-10066,"grade":"B","location":"Zone C","last_date":"2025-12-03"},{"barcode":"MAT0099","name":"셀롱퍼펙트미스트세럼용기","vendor":"저먼유로","category":"용기","stock":-10066,"grade":"B","location":"Zone C","last_date":"2025-12-03"},{"barcode":"MAT0100","name":"셀롱퍼펙트미스트세럼펌프","vendor":"저먼유로","category":"펌프","stock":10000,"grade":"B","location":"Zone C","last_date":"2025-11-25"},{"barcode":"MAT0101","name":"셀바이셀 250ml 공용 수축필름","vendor":"셀바이셀","category":"수축필름","stock":3000,"grade":"C","location":"Zone A","last_date":"2025-12-16"},{"barcode":"MAT0102","name":"셀바이셀 No2 카튼박스","vendor":"셀바이셀","category":"C/T Box","stock":220,"grade":"C","location":"Zone A","last_date":"2025-11-14"},{"barcode":"MAT0103","name":"셀바이셀 No3 카튼박스","vendor":"셀바이셀","category":"C/T Box","stock":60,"grade":"C","location":"Zone A","last_date":"2025-12-16"},{"barcode":"MAT0104","name":"셀바이셀 정품 라벨","vendor":"셀바이셀","category":"라벨","stock":5000,"grade":"C","location":"Zone A","last_date":"2025-11-14"},{"barcode":"MAT0105","name":"솔테라피 다이소 4종_공용 캡","vendor":"영진그린식품","category":"뚜껑","stock":225000,"grade":"A","location":"Zone B","last_date":"2025-10-14"},{"barcode":"MAT0106","name":"솔테라피 라이스 솔트 앤 오일 바디스크럽 듀이자스민_C/T Box","vendor":"영진그린식품","category":"C/T Box","stock":3000,"grade":"C","location":"Zone A","last_date":"2025-09-04"},{"barcode":"MAT0107","name":"솔테라피 라이스 솔트 앤 오일 바디스크럽 듀이자스민_POP 라벨","vendor":"영진그린식품","category":"POP 라벨","stock":44000,"grade":"A","location":"Zone B","last_date":"2025-09-09"},{"barcode":"MAT0108","name":"솔테라피 라이스 솔트 앤 오일 바디스크럽 듀이자스민_파우치","vendor":"영진그린식품","category":"스파우트파우치","stock":50400,"grade":"A","location":"Zone B","last_date":"2025-09-15"},{"barcode":"MAT0109","name":"솔테라피 머그워트 솔트 앤 오일 바디스크럽 그린로즈_C/T Box","vendor":"영진그린식품","category":"C/T Box","stock":3000,"grade":"B","location":"Zone C","last_date":"2025-09-04"},{"barcode":"MAT0110","name":"솔테라피 머그워트 솔트 앤 오일 바디스크럽 그린로즈_POP 라벨","vendor":"영진그린식품","category":"POP 라벨","stock":44000,"grade":"A","location":"Zone B","last_date":"2025-09-09"},{"barcode":"MAT0111","name":"솔테라피 머그워트 솔트 앤 오일 바디스크럽 그린로즈_파우치","vendor":"영진그린식품","category":"스파우트파우치","stock":50400,"grade":"A","location":"Zone B","last_date":"2025-09-23"},{"barcode":"MAT0112","name":"솔테라피 유칼립투스 솔트 앤 오일 바디스크럽 우디브리즈_C/T Box","vendor":"영진그린식품","category":"C/T Box","stock":3000,"grade":"C","location":"Zone A","last_date":"2025-09-04"},{"barcode":"MAT0113","name":"솔테라피 유칼립투스 솔트 앤 오일 바디스크럽 우디브리즈_POP 라벨","vendor":"영진그린식품","category":"POP 라벨","stock":44000,"grade":"A","location":"Zone B","last_date":"2025-09-09"},{"barcode":"MAT0114","name":"솔테라피 유칼립투스 솔트 앤 오일 바디스크럽 우디브리즈_파우치","vendor":"영진그린식품","category":"스파우트파우치","stock":50400,"grade":"A","location":"Zone B","last_date":"2025-09-23"},{"barcode":"MAT0115","name":"솔테라피 허니 솔트 앤 오일 바디스크럽 시트러스블라썸_C/T Box","vendor":"영진그린식품","category":"C/T Box","stock":3000,"grade":"B","location":"Zone C","last_date":"2025-09-04"},{"barcode":"MAT0116","name":"솔테라피 허니 솔트 앤 오일 바디스크럽 시트러스블라썸_POP 라벨","vendor":"영진그린식품","category":"POP 라벨","stock":44000,"grade":"A","location":"Zone B","last_date":"2025-09-09"},{"barcode":"MAT0117","name":"솔테라피 허니 솔트 앤 오일 바디스크럽 시트러스블라썸_슬리브","vendor":"영진그린식품","category":"슬리브","stock":13000,"grade":"C","location":"Zone A","last_date":"2026-03-10"},{"barcode":"MAT0118","name":"솔테라피 허니 솔트 앤 오일 바디스크럽 시트러스블라썸_파우치","vendor":"영진그린식품","category":"스파우트파우치","stock":50400,"grade":"A","location":"Zone B","last_date":"2025-09-25"},{"barcode":"MAT0119","name":"솔테라피_300g_공용용기","vendor":"영진그린식품","category":"용기","stock":2800,"grade":"B","location":"Zone C","last_date":"2025-12-29"},{"barcode":"MAT0120","name":"솔트 앤 오일 바디스크럽_공용 간지","vendor":"영진그린식품","category":"간지","stock":12000,"grade":"B","location":"Zone C","last_date":"2025-09-04"},{"barcode":"MAT0121","name":"솔티 라이스 바디스크럽_300g_뚜껑","vendor":"영진그린식품","category":"뚜껑","stock":70,"grade":"C","location":"Zone A","last_date":"2025-12-30"},{"barcode":"MAT0122","name":"솔티 쑥 바디스크럽_300g_뚜껑","vendor":"영진그린식품","category":"뚜껑","stock":1208,"grade":"C","location":"Zone A","last_date":"2025-09-25"},{"barcode":"MAT0123","name":"솔티 커피 바디스크럽_300g_뚜껑","vendor":"영진그린식품","category":"뚜껑","stock":720,"grade":"C","location":"Zone A","last_date":"2025-10-21"},{"barcode":"MAT0124","name":"솔티 코코 바디스크럽_300g_뚜껑","vendor":"영진그린식품","category":"뚜껑","stock":70,"grade":"C","location":"Zone A","last_date":"2025-12-30"},{"barcode":"MAT0125","name":"솔티 허니 바디스크럽_300g_뚜껑","vendor":"영진그린식품","category":"뚜껑","stock":70,"grade":"C","location":"Zone A","last_date":"2025-12-30"},{"barcode":"MAT0126","name":"시드물 모공 탄력 마스크 팩_22g_파우치","vendor":"시드물","category":"파우치","stock":-10487,"grade":"A","location":"Zone B","last_date":"2025-11-25"},{"barcode":"MAT0127","name":"시드물 알로에 에센셜 수딩 마스크 팩_22g_파우치","vendor":"시드물","category":"파우치","stock":-10087,"grade":"A","location":"Zone B","last_date":"2026-01-29"},{"barcode":"MAT0128","name":"알로에베라겔플러스_단상자","vendor":"인조이랩","category":"단상자","stock":11400,"grade":"B","location":"Zone C","last_date":"2025-09-22"},{"barcode":"MAT0129","name":"알로에베라겔플러스_튜브","vendor":"인조이랩","category":"튜브","stock":10164,"grade":"B","location":"Zone C","last_date":"2025-08-26"},{"barcode":"MAT0130","name":"알로에젤_100g_100개입 Box","vendor":"더에스제이","category":"박스","stock":200,"grade":"C","location":"Zone A","last_date":"2025-09-18"},{"barcode":"MAT0131","name":"알로에젤_100g_100개입_패드","vendor":"더에스제이","category":"패드","stock":400,"grade":"C","location":"Zone A","last_date":"2025-09-18"},{"barcode":"MAT0132","name":"알로에젤_단상자","vendor":"더에스제이","category":"단상자","stock":2901,"grade":"B","location":"Zone C","last_date":"2025-11-17"},{"barcode":"MAT0133","name":"에메랄드퀸 프리미엄 로즈 오일_190ml_단상자","vendor":"에메랄드퀸","category":"단상자","stock":2021,"grade":"C","location":"Zone A","last_date":"2026-03-12"},{"barcode":"MAT0134","name":"엘리자베카 500ml","vendor":"미즈","category":"C/T Box","stock":396,"grade":"C","location":"Zone A","last_date":"2025-09-16"},{"barcode":"MAT0135","name":"엘리자베카 밀키웨어 네츄럴 90% 올리브 클렌징 오일_300ml_용기","vendor":"미즈","category":"용기","stock":17150,"grade":"B","location":"Zone C","last_date":"2025-10-17"},{"barcode":"MAT0136","name":"엘리자베카 스킨 라이어 모이스춰 화이트닝 크림_100ml_튜브","vendor":"미즈","category":"튜브","stock":10142,"grade":"A","location":"Zone B","last_date":"2025-08-20"},{"barcode":"MAT0137","name":"엠비에스크림_단상자","vendor":"저먼유로","category":"단상자","stock":-10066,"grade":"B","location":"Zone C","last_date":"2026-03-10"},{"barcode":"MAT0138","name":"엠비에스크림_뚜껑","vendor":"저먼유로","category":"뚜껑","stock":-4596,"grade":"B","location":"Zone C","last_date":"2026-03-23"},{"barcode":"MAT0139","name":"엠비에스크림_리드","vendor":"저먼유로","category":"리드","stock":4954,"grade":"B","location":"Zone C","last_date":"2026-03-11"},{"barcode":"MAT0140","name":"엠비에스크림_스푼","vendor":"저먼유로","category":"스푼","stock":10000,"grade":"B","location":"Zone C","last_date":"2026-03-11"},{"barcode":"MAT0141","name":"엠비에스크림_용기","vendor":"저먼유로","category":"용기","stock":-19668,"grade":"B","location":"Zone C","last_date":"2026-03-19"},{"barcode":"MAT0142","name":"윙클포스멀티크림_100ml_단상자","vendor":"셀바이셀","category":"단상자","stock":5000,"grade":"B","location":"Zone C","last_date":"2025-11-14"},{"barcode":"MAT0143","name":"윙클포스멀티크림_100ml_뚜껑","vendor":"셀바이셀","category":"뚜껑","stock":5000,"grade":"B","location":"Zone C","last_date":"2025-11-14"},{"barcode":"MAT0144","name":"윙클포스멀티크림_100ml_튜브","vendor":"셀바이셀","category":"튜브","stock":5000,"grade":"B","location":"Zone C","last_date":"2025-11-14"},{"barcode":"MAT0145","name":"자현 120ml 공용 뚜껑","vendor":"인터셀바이오","category":"뚜껑","stock":2000,"grade":"C","location":"Zone A","last_date":"2025-11-11"},{"barcode":"MAT0146","name":"자현 120ml 공용 펌프","vendor":"인터셀바이오","category":"펌프","stock":2000,"grade":"C","location":"Zone A","last_date":"2025-11-11"},{"barcode":"MAT0147","name":"자현 너울 로션 120ml 용기","vendor":"인터셀바이오","category":"용기","stock":1000,"grade":"C","location":"Zone A","last_date":"2025-11-11"},{"barcode":"MAT0148","name":"자현 윤슬 토너 120ml 용기","vendor":"인터셀바이오","category":"용기","stock":1000,"grade":"C","location":"Zone A","last_date":"2025-11-11"},{"barcode":"MAT0149","name":"졸리떼르모이스쳐라이징크림","vendor":"졸리떼르","category":"라벨","stock":2000,"grade":"C","location":"Zone A","last_date":"2025-09-15"},{"barcode":"MAT0150","name":"졸리떼르뷰티퓨어클렌징젤","vendor":"졸리떼르","category":"라벨","stock":2000,"grade":"C","location":"Zone A","last_date":"2025-09-15"},{"barcode":"MAT0151","name":"졸리떼르수딩젤","vendor":"졸리떼르","category":"라벨","stock":2000,"grade":"C","location":"Zone A","last_date":"2025-09-15"},{"barcode":"MAT0152","name":"지퍼백","vendor":"차모스","category":"지퍼백","stock":19800,"grade":"B","location":"Zone C","last_date":"2025-08-28"},{"barcode":"MAT0153","name":"차모스","vendor":"차모스","category":"C/T Box","stock":300,"grade":"C","location":"Zone A","last_date":"2026-01-29"},{"barcode":"MAT0154","name":"차모스 뉴셀큐어 볼륨 텐션 아이크림_단상자(진동)","vendor":"차모스","category":"단상자","stock":-11043,"grade":"B","location":"Zone C","last_date":"2025-11-07"},{"barcode":"MAT0155","name":"차모스 비닐백 손잡이 HDPE","vendor":"차모스","category":"비닐백","stock":20000,"grade":"A","location":"Zone B","last_date":"2025-07-03"},{"barcode":"MAT0156","name":"차모스 스파우트 170g 바디스크럽 2종 공용 스파우트캡","vendor":"차모스","category":"스파우트캡","stock":85000,"grade":"C","location":"Zone A","last_date":"2026-02-24"},{"barcode":"MAT0157","name":"차모스 아가시 글루타치온 부스팅 앰플_50ml_용기","vendor":"차모스","category":"용기","stock":-3823,"grade":"C","location":"Zone A","last_date":"2025-08-28"},{"barcode":"MAT0158","name":"차모스 아가시 글루타치온 부스팅 앰플_50ml_패킹","vendor":"차모스","category":"패킹","stock":5000,"grade":"C","location":"Zone A","last_date":"2025-08-28"},{"barcode":"MAT0159","name":"차모스 아가시 글루타치온 부스팅 앰플_50ml_펌프","vendor":"차모스","category":"펌프","stock":2076,"grade":"C","location":"Zone A","last_date":"2025-08-28"},{"barcode":"MAT0160","name":"차모스 아가시 다크서클 도둑 아이패치_부직포","vendor":"차모스","category":"부직포","stock":-90190,"grade":"C","location":"Zone A","last_date":"2026-02-09"},{"barcode":"MAT0161","name":"차모스 아가시 다크서클 도둑 아이패치_천공펄지","vendor":"차모스","category":"부직포","stock":-90190,"grade":"C","location":"Zone A","last_date":"2026-02-09"},{"barcode":"MAT0162","name":"차모스 아가시 레몬 울트라 화이트닝 크림_50ml_용기","vendor":"차모스","category":"용기","stock":-6823,"grade":"C","location":"Zone A","last_date":"2025-11-13"},{"barcode":"MAT0163","name":"차모스 아가시 매끈 모공 케어 코 팩_1ml_내용물","vendor":"차모스","category":"내용물","stock":70000,"grade":"A","location":"Zone B","last_date":"2025-11-18"},{"barcode":"MAT0164","name":"차모스 아가시 모이스쳐 클렌징 세럼_20ml_파우치+캡","vendor":"차모스","category":"뚜껑","stock":12356,"grade":"B","location":"Zone C","last_date":"2025-12-02"},{"barcode":"MAT0165","name":"차모스 아가시 몬스터 풋 필링팩_18ml_파우치","vendor":"차모스","category":"파우치","stock":-22289,"grade":"A","location":"Zone B","last_date":"2025-12-10"},{"barcode":"MAT0166","name":"차모스 아가시 바이 릴리아나 피디알엔 핑크 콜라겐 글로우 부스터 하이드로겔 마스크_단상자","vendor":"차모스","category":"단상자","stock":-10043,"grade":"C","location":"Zone A","last_date":"2025-10-20"},{"barcode":"MAT0167","name":"차모스 아가시 블루베리 컨트롤 뉴트리 크림_50ml_용기","vendor":"차모스","category":"용기","stock":-6823,"grade":"C","location":"Zone A","last_date":"2025-11-13"},{"barcode":"MAT0168","name":"차모스 아가시 비타C 화이트닝 퍼펙트 나이트 크림_50ml_단상자","vendor":"차모스","category":"단상자","stock":-11043,"grade":"C","location":"Zone A","last_date":"2025-11-21"},{"barcode":"MAT0169","name":"차모스 아가시 비타C 화이트닝 퍼펙트 나이트 크림_50ml_용기","vendor":"차모스","category":"용기","stock":-6823,"grade":"C","location":"Zone A","last_date":"2025-11-13"},{"barcode":"MAT0170","name":"차모스 아가시 사과 인텐시브 뉴트리 크림_50ml_용기","vendor":"차모스","category":"용기","stock":-6823,"grade":"C","location":"Zone A","last_date":"2025-11-13"},{"barcode":"MAT0171","name":"차모스 아가시 셀프 스팀 헤어팩","vendor":"차모스","category":"파우치","stock":-52489,"grade":"C","location":"Zone A","last_date":"2026-02-24"},{"barcode":"MAT0172","name":"차모스 아가시 셀프 스팀 헤어팩_내용물(40g)","vendor":"차모스","category":"내용물","stock":2750,"grade":"C","location":"Zone A","last_date":"2026-03-03"},{"barcode":"MAT0173","name":"차모스 아가시 스네일 리페어 모이스쳐 핸드팩_내용물(16g)","vendor":"차모스","category":"내용물","stock":11600,"grade":"C","location":"Zone A","last_date":"2026-02-12"},{"barcode":"MAT0174","name":"차모스 아가시 스네일 리페어 안티링클 로션_200g_단상자","vendor":"차모스","category":"단상자","stock":-10043,"grade":"C","location":"Zone A","last_date":"2025-12-02"},{"barcode":"MAT0175","name":"차모스 아가시 스네일 리페어 안티링클 로션_200g_패킹","vendor":"차모스","category":"패킹","stock":4000,"grade":"C","location":"Zone A","last_date":"2025-10-31"},{"barcode":"MAT0176","name":"차모스 아가시 스네일 리페어 안티링클 크림_50g_단상자","vendor":"차모스","category":"단상자","stock":-10043,"grade":"B","location":"Zone C","last_date":"2025-12-02"},{"barcode":"MAT0177","name":"차모스 아가시 스네일 리페어 안티링클 크림_50g_뚜껑","vendor":"차모스","category":"뚜껑","stock":-2544,"grade":"B","location":"Zone C","last_date":"2026-01-09"},{"barcode":"MAT0178","name":"차모스 아가시 스네일 리페어 안티링클 크림_50g_리드","vendor":"차모스","category":"리드","stock":-168,"grade":"B","location":"Zone C","last_date":"2026-01-09"},{"barcode":"MAT0179","name":"차모스 아가시 스네일 리페어 안티링클 크림_50g_용기","vendor":"차모스","category":"용기","stock":-3823,"grade":"B","location":"Zone C","last_date":"2026-01-09"},{"barcode":"MAT0180","name":"차모스 아가시 스네일 리페어 안티링클 토너_200ml_단상자","vendor":"차모스","category":"단상자","stock":-10043,"grade":"B","location":"Zone C","last_date":"2025-12-02"},{"barcode":"MAT0181","name":"차모스 아가시 스네일 리페어 안티링클 토너_200ml_라벨","vendor":"차모스","category":"라벨","stock":6535,"grade":"B","location":"Zone C","last_date":"2026-02-03"},{"barcode":"MAT0182","name":"차모스 아가시 스파클링 버블 마스크팩_23ml_파우치","vendor":"차모스","category":"파우치","stock":-389,"grade":"C","location":"Zone A","last_date":"2026-01-19"},{"barcode":"MAT0183","name":"차모스 아가시 스페셜 블루베리 후르츠 클렌징_125ml_단상자","vendor":"차모스","category":"단상자","stock":-13043,"grade":"C","location":"Zone A","last_date":"2025-12-02"},{"barcode":"MAT0184","name":"차모스 아가시 스페셜 사과 후르츠 클렌징_125ml_단상자","vendor":"차모스","category":"단상자","stock":-13043,"grade":"C","location":"Zone A","last_date":"2025-12-02"},{"barcode":"MAT0185","name":"차모스 아가시 콜라겐 리페어 실크 마스크팩_23ml_파우치","vendor":"차모스","category":"파우치","stock":-39589,"grade":"A","location":"Zone B","last_date":"2026-01-16"},{"barcode":"MAT0186","name":"차모스 아가시 트러블 스킨 솔루션 매직 파우더_30ml_위생허가용_단상자","vendor":"차모스","category":"단상자","stock":-10043,"grade":"B","location":"Zone C","last_date":"2025-10-10"},{"barcode":"MAT0187","name":"차모스 아가시 홍삼 육두구 에너지 마스크팩","vendor":"차모스","category":"파우치","stock":-30989,"grade":"C","location":"Zone A","last_date":"2026-02-06"},{"barcode":"MAT0188","name":"차모스 아가시 홍삼 육두구 에너지 마스크팩_5매입 단상자","vendor":"차모스","category":"단상자","stock":-7193,"grade":"C","location":"Zone A","last_date":"2026-02-10"},{"barcode":"MAT0189","name":"차모스 아웃박스 (CHA-0)","vendor":"차모스","category":"C/T Box","stock":598,"grade":"C","location":"Zone A","last_date":"2026-02-05"},{"barcode":"MAT0190","name":"차모스 아웃박스 (CHA-0-1)","vendor":"차모스","category":"C/T Box","stock":1000,"grade":"C","location":"Zone A","last_date":"2026-02-27"},{"barcode":"MAT0191","name":"차모스 인박스 (CHA-0-1)","vendor":"차모스","category":"C/T Box","stock":3000,"grade":"C","location":"Zone A","last_date":"2025-11-21"},{"barcode":"MAT0192","name":"차모스500ml공용용기_500ml_갈색용기","vendor":"차모스","category":"용기","stock":-6823,"grade":"C","location":"Zone A","last_date":"2025-12-23"},{"barcode":"MAT0193","name":"차모스공용원터치캡_검정_500ml_뚜껑","vendor":"차모스","category":"뚜껑","stock":-5544,"grade":"C","location":"Zone A","last_date":"2025-10-31"},{"barcode":"MAT0194","name":"차모스뉴셀큐어매직컬스팅스피큘크림_단상자","vendor":"차모스","category":"단상자","stock":-9043,"grade":"B","location":"Zone C","last_date":"2025-11-19"},{"barcode":"MAT0195","name":"차모스뉴셀큐어볼륨텐션 리턴크림_단상자","vendor":"차모스","category":"단상자","stock":-11043,"grade":"C","location":"Zone A","last_date":"2025-07-28"},{"barcode":"MAT0196","name":"차모스아가시바이릴리아나피디알엔핑크콜라겐글로우부스터하이드로겔마스크","vendor":"차모스","category":"완제품","stock":17215,"grade":"A","location":"Zone B","last_date":"2025-12-16"},{"barcode":"MAT0197","name":"차모스아가시셀프스팀케어헤어팩_내용물","vendor":"차모스","category":"내용물","stock":1350,"grade":"C","location":"Zone A","last_date":"2025-11-28"},{"barcode":"MAT0198","name":"차모스아가시스네일리페어모이스쳐라이징풋팩","vendor":"차모스","category":"파우치","stock":-22089,"grade":"A","location":"Zone B","last_date":"2025-12-10"},{"barcode":"MAT0199","name":"차모스아가시스네일리페어모이스쳐라이징풋팩_내용물","vendor":"차모스","category":"내용물","stock":11650,"grade":"B","location":"Zone C","last_date":"2025-11-28"},{"barcode":"MAT0200","name":"차모스아가시스네일리페어모이스쳐핸드팩_내용물","vendor":"차모스","category":"내용물","stock":11800,"grade":"B","location":"Zone C","last_date":"2025-11-28"},{"barcode":"MAT0201","name":"차모스아가시스코리아버블마스크_단상자1","vendor":"차모스","category":"단상자","stock":-13043,"grade":"C","location":"Zone A","last_date":"2025-12-03"},{"barcode":"MAT0202","name":"차모스아가시스코리아버블마스크_단상자2","vendor":"차모스","category":"단상자","stock":-13043,"grade":"C","location":"Zone A","last_date":"2025-12-03"},{"barcode":"MAT0203","name":"차모스아가시슬림브이핏턱케어패치_내용물","vendor":"차모스","category":"내용물","stock":10000,"grade":"B","location":"Zone C","last_date":"2025-08-27"},{"barcode":"MAT0204","name":"차모스아가시앰플50ml_공용_50ml_스포이드","vendor":"차모스","category":"스포이드","stock":4008,"grade":"B","location":"Zone C","last_date":"2025-08-07"},{"barcode":"MAT0205","name":"차모스아가시앰플50ml_공용_50ml_용기","vendor":"차모스","category":"용기","stock":-3823,"grade":"B","location":"Zone C","last_date":"2025-08-07"},{"barcode":"MAT0206","name":"차모스아가시앰플50ml_공용_50ml_패킹","vendor":"차모스","category":"패킹","stock":5000,"grade":"B","location":"Zone C","last_date":"2025-08-07"},{"barcode":"MAT0207","name":"차모스아가시트러블솔루션매직파우더_뚜껑","vendor":"차모스","category":"뚜껑","stock":-2544,"grade":"B","location":"Zone C","last_date":"2025-07-02"},{"barcode":"MAT0208","name":"차모스아가시피디알엔하이드로겔마스크팩","vendor":"차재","category":"파우치","stock":-89989,"grade":"B","location":"Zone C","last_date":"2025-08-18"},{"barcode":"MAT0209","name":"크림공용리드_50ml_리드","vendor":"차모스","category":"리드","stock":2832,"grade":"B","location":"Zone C","last_date":"2025-11-13"},{"barcode":"MAT0210","name":"크림공용백색뚜껑_50ml_뚜껑","vendor":"차모스","category":"뚜껑","stock":456,"grade":"B","location":"Zone C","last_date":"2025-11-13"},{"barcode":"MAT0211","name":"텐셀40g홀타입-오티케이__부직포","vendor":"차모스","category":"부직포","stock":-90690,"grade":"A","location":"Zone B","last_date":"2026-02-09"},{"barcode":"MAT0212","name":"통펄지","vendor":"차모스","category":"필름","stock":-18288,"grade":"C","location":"Zone A","last_date":"2026-02-06"},{"barcode":"MAT0213","name":"퓨리파잉씨밸런스크림_250ml_뚜껑","vendor":"셀바이셀","category":"뚜껑","stock":2000,"grade":"C","location":"Zone A","last_date":"2025-12-16"},{"barcode":"MAT0214","name":"퓨리파잉씨밸런스크림_250ml_튜브","vendor":"셀바이셀","category":"튜브","stock":2000,"grade":"C","location":"Zone A","last_date":"2025-12-16"},{"barcode":"MAT0215","name":"프랑스 부직포_RPT3-70","vendor":"차모스","category":"부직포","stock":-77690,"grade":"B","location":"Zone C","last_date":"2026-02-09"},{"barcode":"MAT0216","name":"피오셀 29 원단(마스크팩 원단)","vendor":"시드물","category":"부직포","stock":-6887,"grade":"A","location":"Zone B","last_date":"2026-01-22"},{"barcode":"MAT0217","name":"홍콩_히니지니소프트풋필링팩_세트단상자","vendor":"차모스","category":"단상자","stock":-10043,"grade":"B","location":"Zone C","last_date":"2025-07-25"},{"barcode":"MAT0218","name":"히니지니 소프트 풋 필링팩_18ml_파우치","vendor":"차모스","category":"파우치","stock":-9189,"grade":"A","location":"Zone B","last_date":"2025-08-28"}];
+
+// State
+let data = RAW_DATA.map(d => ({...d})); // mutable copy
+let history = [];
+let currentItem = null;
+let scanActive = false;
+let gradeFilter = 'ALL';
+let inventoryPage = 1;
+const PAGE_SIZE = 20;
+
+// Initialize
+document.addEventListener('DOMContentLoaded', () => {
+  updateDashboard();
+  renderInventory();
+});
+
+// TAB SWITCHING
+function switchTab(tab) {
+  document.querySelectorAll('.tab').forEach((t,i) => {
+    t.classList.toggle('active', ['scan','inventory','dashboard'][i] === tab);
+  });
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById('page-' + tab).classList.add('active');
+  if (tab === 'inventory') renderInventory();
+  if (tab === 'dashboard') updateDashboard();
+}
+
+// SCAN
+function toggleScan() {
+  if (scanActive) stopScan();
+  else startScan();
+}
+
+function startScan() {
+  const container = document.getElementById('scanner-container');
+  document.getElementById('scan-inactive').style.display = 'none';
+  Quagga.init({
+    inputStream: {
+      name: 'Live',
+      type: 'LiveStream',
+      target: container,
+      constraints: { facingMode: 'environment', width: { min: 640 }, height: { min: 480 } }
+    },
+    decoder: { readers: ['code_128_reader','ean_reader','ean_8_reader','code_39_reader','upc_reader'] }
+  }, (err) => {
+    if (err) {
+      showToast('카메라 접근 실패. 직접 입력을 이용하세요.', 'error');
+      document.getElementById('scan-inactive').style.display = 'flex';
+      return;
+    }
+    Quagga.start();
+    scanActive = true;
+    document.getElementById('scan-toggle-btn').textContent = '⏹ 스캔 중지';
+    document.getElementById('scan-toggle-btn').classList.add('stop');
+
+    // Add overlay
+    const overlay = document.createElement('div');
+    overlay.className = 'scan-overlay';
+    overlay.innerHTML = '<div class="scan-line"></div>';
+    container.appendChild(overlay);
+  });
+  Quagga.onDetected((result) => {
+    const code = result.codeResult.code;
+    stopScan();
+    document.getElementById('barcode-input').value = code;
+    searchBarcode();
+  });
+}
+
+function stopScan() {
+  if (!scanActive) return;
+  Quagga.stop();
+  scanActive = false;
+  document.getElementById('scan-inactive').style.display = 'flex';
+  document.getElementById('scan-toggle-btn').textContent = '📷 카메라 스캔 시작';
+  document.getElementById('scan-toggle-btn').classList.remove('stop');
+  // Remove overlay
+  const overlay = document.querySelector('.scan-overlay');
+  if (overlay) overlay.remove();
+}
+
+function quickSearch(code) {
+  document.getElementById('barcode-input').value = code;
+  searchBarcode();
+}
+
+function searchBarcode() {
+  const input = document.getElementById('barcode-input').value.trim().toUpperCase();
+  const item = data.find(d => d.barcode === input || d.barcode.toUpperCase() === input);
+  if (item) showResult(item);
+  else showNotFound(input);
+}
+
+function showResult(item) {
+  currentItem = item;
+  const stockClass = item.stock > 1000 ? 'green' : item.stock > 0 ? 'yellow' : 'red';
+  const stockText = item.stock.toLocaleString();
+  document.getElementById('scan-result').innerHTML = `
+    <div class="result-card">
+      <div class="result-header">
+        <div class="result-name">${item.name}</div>
+        <div class="grade-badge grade-${item.grade}">${item.grade}</div>
+      </div>
+      <div class="location-banner">
+        <span class="location-icon">📍</span>
+        <div class="location-text">보관위치: <strong>${item.location}</strong></div>
+      </div>
+      <div class="info-grid">
+        <div class="info-item">
+          <div class="info-label">바코드</div>
+          <div class="info-value mono">${item.barcode}</div>
+        </div>
+        <div class="info-item">
+          <div class="info-label">분류</div>
+          <div class="info-value">${item.category}</div>
+        </div>
+        <div class="info-item">
+          <div class="info-label">거래처</div>
+          <div class="info-value">${item.vendor}</div>
+        </div>
+        <div class="info-item">
+          <div class="info-label">최근입고</div>
+          <div class="info-value mono" style="font-size:12px;">${item.last_date}</div>
+        </div>
+      </div>
+      <div class="info-item" style="margin-bottom:12px;">
+        <div class="info-label">현재 재고 (EA)</div>
+        <div class="info-value mono ${stockClass}" style="font-size:22px;">${stockText}</div>
+      </div>
+      <div class="action-row">
+        <button class="action-btn in" onclick="openModal('in')">📥 입고</button>
+        <button class="action-btn out" onclick="openModal('out')">📤 출고</button>
+      </div>
+    </div>`;
+}
+
+function showNotFound(code) {
+  document.getElementById('scan-result').innerHTML = `
+    <div class="not-found">
+      <div class="big">🔍</div>
+      <p>"${code}"에 해당하는 자재를 찾을 수 없습니다.</p>
+    </div>`;
+}
+
+// MODAL
+function openModal(type) {
+  if (!currentItem) return;
+  if (type === 'in') {
+    document.getElementById('modal-in-name').textContent = currentItem.name;
+    document.getElementById('modal-in-qty').value = '';
+    document.getElementById('modal-in').classList.add('open');
+    setTimeout(() => document.getElementById('modal-in-qty').focus(), 300);
+  } else {
+    document.getElementById('modal-out-name').textContent = currentItem.name;
+    document.getElementById('modal-out-qty').value = '';
+    document.getElementById('modal-out').classList.add('open');
+    setTimeout(() => document.getElementById('modal-out-qty').focus(), 300);
+  }
+}
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+function confirmIn() {
+  const qty = parseInt(document.getElementById('modal-in-qty').value);
+  if (!qty || qty <= 0) { showToast('수량을 입력하세요', 'error'); return; }
+  currentItem.stock += qty;
+  const idx = data.findIndex(d => d.barcode === currentItem.barcode);
+  if (idx !== -1) data[idx] = currentItem;
+  addHistory('in', currentItem, qty);
+  closeModal('modal-in');
+  showResult(currentItem);
+  showToast(`✅ 입고 완료 +${qty.toLocaleString()}EA`, 'success');
+  updateDashboard();
+}
+
+function confirmOut() {
+  const qty = parseInt(document.getElementById('modal-out-qty').value);
+  if (!qty || qty <= 0) { showToast('수량을 입력하세요', 'error'); return; }
+  currentItem.stock -= qty;
+  const idx = data.findIndex(d => d.barcode === currentItem.barcode);
+  if (idx !== -1) data[idx] = currentItem;
+  addHistory('out', currentItem, qty);
+  closeModal('modal-out');
+  showResult(currentItem);
+  showToast(`✅ 출고 완료 -${qty.toLocaleString()}EA`, 'success');
+  updateDashboard();
+}
+
+function addHistory(type, item, qty) {
+  const now = new Date();
+  const time = now.getHours().toString().padStart(2,'0') + ':' + now.getMinutes().toString().padStart(2,'0');
+  history.unshift({ type, name: item.name, qty, time, barcode: item.barcode });
+  if (history.length > 50) history.pop();
+}
+
+// INVENTORY
+function setGradeFilter(el) {
+  document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+  gradeFilter = el.dataset.grade;
+  inventoryPage = 1;
+  renderInventory();
+}
+
+function renderInventory() {
+  const search = document.getElementById('inv-search').value.toLowerCase();
+  let filtered = data.filter(item => {
+    const matchSearch = !search || item.name.toLowerCase().includes(search) || item.vendor.toLowerCase().includes(search);
+    const matchGrade = gradeFilter === 'ALL' || 
+      (gradeFilter === 'SHORTAGE' ? item.stock <= 0 : item.grade === gradeFilter);
+    return matchSearch && matchGrade;
+  });
+
+  const total = filtered.length;
+  const shown = filtered.slice(0, inventoryPage * PAGE_SIZE);
+  
+  document.getElementById('item-list').innerHTML = shown.map(item => {
+    const stockColor = item.stock > 0 ? 'var(--green)' : 'var(--red)';
+    return `<div class="item-row" onclick="selectItem('${item.barcode}')">
+      <div class="item-grade-dot dot-${item.grade}"></div>
+      <div class="item-info">
+        <div class="item-name">${item.name}</div>
+        <div class="item-meta">${item.vendor} · ${item.category} · ${item.location}</div>
+      </div>
+      <div class="item-stock" style="color:${stockColor}">${item.stock.toLocaleString()}</div>
+    </div>`;
+  }).join('');
+
+  document.getElementById('pagination-info').textContent = `${Math.min(shown.length, total)} / ${total}개 표시`;
+  document.getElementById('load-more-btn').style.display = shown.length >= total ? 'none' : 'block';
+}
+
+function loadMore() { inventoryPage++; renderInventory(); }
+
+function selectItem(barcode) {
+  const item = data.find(d => d.barcode === barcode);
+  if (item) {
+    switchTab('scan');
+    document.getElementById('barcode-input').value = barcode;
+    showResult(item);
+    window.scrollTo(0, 0);
+  }
+}
+
+// DASHBOARD
+function updateDashboard() {
+  const total = data.length;
+  const shortage = data.filter(d => d.stock <= 0).length;
+  const aCount = data.filter(d => d.grade === 'A').length;
+  const bCount = data.filter(d => d.grade === 'B').length;
+  const cCount = data.filter(d => d.grade === 'C').length;
+
+  document.getElementById('stat-total').textContent = total;
+  document.getElementById('stat-shortage').textContent = shortage;
+  document.getElementById('stat-a').textContent = aCount;
+  document.getElementById('stat-today').textContent = history.length;
+
+  // Grade bar
+  const aPct = (aCount/total*100).toFixed(1);
+  const bPct = (bCount/total*100).toFixed(1);
+  const cPct = (cCount/total*100).toFixed(1);
+  document.getElementById('grade-bar').innerHTML = `
+    <div class="grade-seg" style="width:${aPct}%; background: var(--grade-a);"></div>
+    <div class="grade-seg" style="width:${bPct}%; background: var(--grade-b);"></div>
+    <div class="grade-seg" style="width:${cPct}%; background: var(--grade-c);"></div>`;
+  document.getElementById('bar-a-pct').textContent = `${aCount}개 (${aPct}%)`;
+  document.getElementById('bar-b-pct').textContent = `${bCount}개 (${bPct}%)`;
+  document.getElementById('bar-c-pct').textContent = `${cCount}개 (${cPct}%)`;
+
+  // Zone stats
+  const zones = {};
+  data.forEach(d => { zones[d.location] = (zones[d.location]||0) + 1; });
+  document.getElementById('zone-stats').innerHTML = Object.entries(zones)
+    .sort((a,b) => b[1]-a[1])
+    .map(([zone, cnt]) => `
+      <div style="display:flex; justify-content:space-between; align-items:center; padding: 8px 0; border-bottom: 1px solid var(--border);">
+        <span style="font-size:14px; font-weight:600;">${zone}</span>
+        <div style="display:flex; align-items:center; gap: 12px;">
+          <div style="width: 80px; height: 6px; background: var(--bg2); border-radius: 3px; overflow:hidden;">
+            <div style="width:${cnt/total*100}%; height:100%; background: var(--accent); border-radius: 3px;"></div>
+          </div>
+          <span style="font-family:'JetBrains Mono',monospace; font-size:13px; color: var(--accent); width:30px; text-align:right;">${cnt}</span>
+        </div>
+      </div>`).join('');
+
+  // History
+  if (history.length === 0) {
+    document.getElementById('history-list').innerHTML = `<div style="color: var(--text2); text-align: center; padding: 20px; font-size: 13px;">아직 입출고 내역이 없습니다.<br>스캔 탭에서 입출고를 처리하세요.</div>`;
+  } else {
+    document.getElementById('history-list').innerHTML = history.slice(0,10).map(h => `
+      <div class="history-item">
+        <div class="history-type ${h.type}">${h.type === 'in' ? '입고' : '출고'}</div>
+        <div class="history-name">${h.name}</div>
+        <div class="history-qty" style="color: ${h.type === 'in' ? 'var(--green)' : 'var(--red)'}">
+          ${h.type === 'in' ? '+' : '-'}${h.qty.toLocaleString()}
+        </div>
+        <div class="history-time">${h.time}</div>
+      </div>`).join('');
+  }
+}
+
+// TOAST
+function showToast(msg, type) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = `toast show ${type}`;
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+</script>
+</body>
+</html>
