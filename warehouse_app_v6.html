@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>차모스 자재관리 시스템</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&family=JetBrains+Mono:wght@400;700&display=swap');
+:root{--bg:#0d1117;--bg2:#161b22;--bg3:#21262d;--border:#30363d;--text:#e6edf3;--text2:#8b949e;--accent:#58a6ff;--accent2:#1f6feb;--green:#3fb950;--red:#f85149;--yellow:#d29922;--purple:#a371f7;}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;max-width:480px;margin:0 auto}
+/* NAV */
+.nav{background:var(--bg2);border-bottom:1px solid var(--border);padding:12px 16px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
+.nav-title{font-size:14px;font-weight:700}.nav-title span{color:var(--accent)}
+.nav-badge{font-family:'JetBrains Mono',monospace;font-size:11px;background:var(--accent2);color:#fff;padding:2px 8px;border-radius:20px}
+/* TABS */
+.tabs{display:flex;background:var(--bg2);border-bottom:1px solid var(--border);padding:0 4px}
+.tab{flex:1;padding:9px 2px;text-align:center;font-size:11px;font-weight:500;color:var(--text2);cursor:pointer;border-bottom:2px solid transparent;transition:all .2s;user-select:none}
+.tab.active{color:var(--accent);border-bottom-color:var(--accent)}
+.tab-icon{font-size:15px;display:block;margin-bottom:2px}
+.page{display:none;padding:12px}.page.active{display:block}
+/* SCAN AREA */
+.scan-area{background:var(--bg3);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:12px}
+#scanner-container{position:relative;height:190px;background:#000;display:flex;align-items:center;justify-content:center;overflow:hidden}
+#scanner-container video,#scanner-container canvas{position:absolute;top:0;left:0;width:100%!important;height:100%!important;object-fit:cover}
+.scan-overlay{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:190px;height:65px;border:2px solid var(--accent);border-radius:6px;box-shadow:0 0 0 2000px rgba(0,0,0,.5);pointer-events:none;z-index:10}
+.scan-line{position:absolute;left:0;right:0;height:2px;background:var(--accent);animation:scan 2s linear infinite;box-shadow:0 0 8px var(--accent)}
+@keyframes scan{0%{top:4px}100%{top:calc(100% - 6px)}}
+.scan-inactive{display:flex;flex-direction:column;align-items:center;justify-content:center;height:190px;gap:10px;color:var(--text2)}
+.scan-inactive .big-icon{font-size:38px}
+.scan-btn{width:100%;padding:11px;background:var(--accent2);color:#fff;border:none;font-family:'Noto Sans KR',sans-serif;font-size:13px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px}
+.scan-btn.stop{background:#21262d;border-top:1px solid var(--border)}
+/* SEARCH */
+.search-box{background:var(--bg3);border:1px solid var(--border);border-radius:12px;padding:12px;margin-bottom:12px}
+.search-box h3{font-size:11px;color:var(--text2);margin-bottom:8px;font-weight:500}
+.input-row{display:flex;gap:8px}
+input[type=text],input[type=number]{flex:1;background:var(--bg);border:1px solid var(--border);color:var(--text);padding:9px 11px;border-radius:8px;font-family:'JetBrains Mono',monospace;font-size:13px;outline:none;transition:border-color .2s}
+input[type=text]:focus,input[type=number]:focus{border-color:var(--accent)}
+.btn-sm{padding:9px 12px;background:var(--bg3);border:1px solid var(--border);color:var(--text);border-radius:8px;font-family:'Noto Sans KR',sans-serif;font-size:12px;cursor:pointer;transition:all .2s;white-space:nowrap}
+.btn-sm:hover{border-color:var(--accent);color:var(--accent)}.btn-sm.primary{background:var(--accent2);border-color:var(--accent2);color:#fff}
+/* PRODUCT CARD */
+.product-card{background:var(--bg3);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:12px;animation:fadeIn .3s ease}
+@keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.product-header{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:10px}
+.product-name{font-size:13px;font-weight:700;line-height:1.4;flex:1}
+.grade-badge{flex-shrink:0;width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:12px}
+.grade-A{background:rgba(63,185,80,.2);color:#3fb950;border:1px solid #3fb950}
+.grade-B{background:rgba(88,166,255,.2);color:#58a6ff;border:1px solid #58a6ff}
+.grade-C{background:rgba(139,148,158,.2);color:#8b949e;border:1px solid #8b949e}
+/* INFO ROW */
+.info-row{display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap}
+.info-chip{background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:5px 9px;font-size:11px;display:flex;align-items:center;gap:5px}
+.info-chip .label{color:var(--text2)}.info-chip .val{font-weight:600;font-family:'JetBrains Mono',monospace}
+/* SUB MATERIAL TABLE */
+.sub-title{font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;display:flex;align-items:center;gap:6px}
+.sub-title::after{content:'';flex:1;height:1px;background:var(--border)}
+.sub-table{width:100%;border-collapse:collapse;margin-bottom:10px;table-layout:fixed}
+.sub-table col:nth-child(1){width:35%}
+.sub-table col:nth-child(2){width:20%}
+.sub-table col:nth-child(3){width:45%}
+.sub-table th{font-size:10px;color:var(--text2);font-weight:500;padding:5px 6px;text-align:left;border-bottom:1px solid var(--border);background:var(--bg2)}
+.sub-table th:last-child,.sub-table td:last-child{text-align:center}
+.sub-table td{padding:7px 6px;border-bottom:1px solid var(--border);font-size:12px;vertical-align:middle}
+.sub-table tr:last-child td{border-bottom:none}
+.sub-table tr:hover td{background:rgba(88,166,255,.04)}
+.stock-val{font-family:'JetBrains Mono',monospace;font-weight:700;font-size:13px}
+.stock-ok{color:#3fb950}.stock-low{color:#d29922}.stock-empty{color:#f85149}
+.sub-bar{width:50px;height:4px;background:var(--bg3);border-radius:2px;overflow:hidden;display:inline-block;margin-left:4px;vertical-align:middle}
+.sub-bar-fill{height:100%;border-radius:2px}
+/* ACTION BUTTONS PER SUB */
+.sub-actions{display:flex;gap:4px;justify-content:center;flex-wrap:wrap}
+.sa-btn{padding:3px 7px;border-radius:5px;border:none;font-family:'Noto Sans KR',sans-serif;font-size:10px;font-weight:600;cursor:pointer;transition:all .15s}
+.sa-in{background:rgba(63,185,80,.15);color:#3fb950;border:1px solid rgba(63,185,80,.4)}
+.sa-out{background:rgba(248,81,73,.15);color:#f85149;border:1px solid rgba(248,81,73,.4)}
+.sa-loss{background:rgba(163,113,247,.15);color:#a371f7;border:1px solid rgba(163,113,247,.4)}
+.sa-fix{background:rgba(210,153,34,.15);color:#d29922;border:1px solid rgba(210,153,34,.4)}
+.sa-empty{background:rgba(248,81,73,.1);color:#f85149;border:1px solid rgba(248,81,73,.5);font-size:9px!important}
+.sa-btn:hover{filter:brightness(1.25)}
+/* WARNING */
+.warn-row{background:rgba(248,81,73,.12);border:1px solid rgba(248,81,73,.4);border-radius:8px;padding:8px 12px;margin-bottom:8px;font-size:12px;color:#f85149;font-weight:600;display:flex;align-items:center;gap:8px}
+.caution-row{background:rgba(210,153,34,.1);border:1px solid rgba(210,153,34,.3);border-radius:8px;padding:8px 12px;margin-bottom:8px;font-size:12px;color:#d29922;font-weight:600;display:flex;align-items:center;gap:8px}
+/* ZERO CHECK */
+.zero-banner{background:rgba(88,166,255,.12);border:1px solid var(--accent);border-radius:10px;padding:12px;margin-bottom:10px;text-align:center}
+.zero-title{font-size:12px;font-weight:700;color:var(--accent);margin-bottom:8px}
+.zero-row{display:flex;gap:8px}
+.zero-btn{flex:1;padding:9px;border-radius:8px;border:none;font-family:'Noto Sans KR',sans-serif;font-size:12px;font-weight:700;cursor:pointer}
+.zero-btn.yes{background:#3fb950;color:#000}.zero-btn.no{background:#f85149;color:#fff}
+/* MODAL */
+.modal-overlay{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.72);z-index:300;align-items:flex-end}
+.modal-overlay.open{display:flex}
+.modal{width:100%;max-width:480px;margin:0 auto;background:var(--bg2);border-radius:16px 16px 0 0;border-top:1px solid var(--border);padding:18px;animation:slideUp .28s ease}
+@keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
+.modal-title{font-size:14px;font-weight:700;margin-bottom:3px}
+.modal-sub{font-size:11px;color:var(--text2);margin-bottom:12px}
+.modal-field{margin-bottom:10px}
+.modal-field label{font-size:11px;color:var(--text2);display:block;margin-bottom:4px}
+.modal-field input,.modal-field select{width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);padding:10px 11px;border-radius:8px;font-family:'Noto Sans KR',sans-serif;font-size:13px;outline:none}
+.modal-field input:focus,.modal-field select:focus{border-color:var(--accent)}
+.modal-field select option{background:var(--bg2)}
+.modal-btns{display:flex;gap:8px;margin-top:12px}
+.modal-btn{flex:1;padding:12px;border-radius:8px;border:none;font-family:'Noto Sans KR',sans-serif;font-size:13px;font-weight:700;cursor:pointer}
+.mb-cancel{background:var(--bg3);color:var(--text2)}
+.mb-in{background:#3fb950;color:#000}.mb-out{background:#f85149;color:#fff}
+.mb-loss{background:#a371f7;color:#fff}.mb-fix{background:#d29922;color:#000}
+/* INVENTORY */
+.filter-row{display:flex;gap:5px;margin-bottom:9px;flex-wrap:wrap}
+.chip{padding:4px 9px;border-radius:20px;border:1px solid var(--border);font-size:11px;cursor:pointer;background:var(--bg3);color:var(--text2);transition:all .2s;user-select:none}
+.chip.active{border-color:var(--accent);color:var(--accent);background:rgba(88,166,255,.1)}
+.search-wrap{position:relative;margin-bottom:9px}
+.search-wrap input{width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:9px 11px 9px 32px;border-radius:8px;font-family:'Noto Sans KR',sans-serif;font-size:12px;outline:none}
+.search-wrap input:focus{border-color:var(--accent)}
+.s-icon{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--text2);font-size:14px}
+.inv-list{display:flex;flex-direction:column;gap:6px}
+.inv-row{background:var(--bg3);border:1px solid var(--border);border-radius:9px;padding:10px 11px;display:flex;align-items:center;gap:9px;cursor:pointer;transition:border-color .2s}
+.inv-row:hover{border-color:var(--accent)}
+.inv-row.warn{border-color:rgba(248,81,73,.4);background:rgba(248,81,73,.05)}
+.inv-row.low{border-color:rgba(210,153,34,.4);background:rgba(210,153,34,.05)}
+.gdot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.dA{background:#3fb950}.dB{background:#58a6ff}.dC{background:#8b949e}
+.inv-info{flex:1;min-width:0}
+.inv-name{font-size:11px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.inv-meta{font-size:10px;color:var(--text2);margin-top:1px}
+.inv-sub-count{font-size:10px;color:var(--text2);text-align:right;flex-shrink:0}
+.inv-warn-dot{width:8px;height:8px;border-radius:50%;background:#f85149;flex-shrink:0}
+.load-more{text-align:center;padding:10px;color:var(--text2);font-size:12px;cursor:pointer}
+.load-more:hover{color:var(--accent)}
+.page-info{font-size:10px;color:var(--text2);text-align:center;margin-top:5px}
+/* AUDIT */
+.audit-list{display:flex;flex-direction:column;gap:6px}
+.audit-item{background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:9px 11px;font-size:11px}
+.audit-hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:3px}
+.atype{padding:2px 6px;border-radius:4px;font-size:10px;font-weight:700}
+.at-in{background:rgba(63,185,80,.2);color:#3fb950}.at-out{background:rgba(248,81,73,.2);color:#f85149}
+.at-loss{background:rgba(163,113,247,.2);color:#a371f7}.at-fix{background:rgba(210,153,34,.2);color:#d29922}
+.at-mm{background:rgba(248,81,73,.2);color:#f85149}
+.atime{font-size:10px;color:var(--text2);font-family:'JetBrains Mono',monospace}
+.aname{color:var(--text);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.adetail{color:var(--text2);margin-top:1px}
+.inner-tabs{display:flex;gap:5px;margin-bottom:10px}
+.itab{padding:5px 10px;border-radius:20px;border:1px solid var(--border);font-size:11px;cursor:pointer;background:var(--bg3);color:var(--text2);transition:all .2s}
+.itab.active{border-color:var(--accent);color:var(--accent);background:rgba(88,166,255,.1)}
+/* TOAST */
+.toast{position:fixed;bottom:65px;left:50%;transform:translateX(-50%);background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:9px 16px;font-size:12px;z-index:999;opacity:0;transition:opacity .3s;white-space:nowrap;box-shadow:0 4px 20px rgba(0,0,0,.5);max-width:92%}
+.toast.show{opacity:1}.toast.ok{border-color:#3fb950;color:#3fb950}.toast.err{border-color:#f85149;color:#f85149}.toast.warn{border-color:#d29922;color:#d29922}
+.not-found{text-align:center;padding:28px 14px;color:var(--text2)}
+.not-found .big{font-size:34px;margin-bottom:7px}
+</style>
+</head>
+<body>
+<div class="nav">
+  <div class="nav-title"><span>차모스</span> 자재관리</div>
+  <div class="nav-badge" id="total-count">85개 품목</div>
+</div>
+<div class="tabs">
+  <div class="tab active" onclick="switchTab('scan')"><span class="tab-icon">📷</span>스캔</div>
+  <div class="tab" onclick="switchTab('inventory')"><span class="tab-icon">📋</span>재고</div>
+  <div class="tab" onclick="switchTab('audit')"><span class="tab-icon">📝</span>로그</div>
+</div>
+
+<!-- SCAN PAGE -->
+<div class="page active" id="page-scan">
+  <div class="scan-area">
+    <div id="scanner-container">
+      <div class="scan-inactive" id="scan-inactive"><div class="big-icon">📷</div><p style="font-size:12px">슬롯 바코드를 스캔하세요</p></div>
+    </div>
+    <button class="scan-btn" id="scan-btn" onclick="toggleScan()">📷 카메라 스캔 시작</button>
+  </div>
+  <div class="search-box">
+    <h3>바코드 직접 입력 (예: MAT0000)</h3>
+    <div class="input-row">
+      <input type="text" id="barcode-input" placeholder="MAT0000" onkeydown="if(event.key==='Enter')searchBarcode()">
+      <button class="btn-sm primary" onclick="searchBarcode()">조회</button>
+    </div>
+    <div style="margin-top:7px;display:flex;gap:5px;flex-wrap:wrap">
+      <button class="btn-sm" onclick="qs('MAT0000')" style="font-size:10px">MAT0000 내몸은육두구토너</button>
+      <button class="btn-sm" onclick="qs('MAT0002')" style="font-size:10px">MAT0002 스네일크림</button>
+      <button class="btn-sm" onclick="qs('MAT0013')" style="font-size:10px">MAT0013 풋필링팩</button>
+    </div>
+  </div>
+  <div id="scan-result"></div>
+</div>
+
+<!-- INVENTORY PAGE -->
+<div class="page" id="page-inventory">
+  <div class="search-wrap"><span class="s-icon"></span><input type="text" id="inv-search" placeholder="제품명, 거래처, 바코드(MAT), 위치(P) 검색..." oninput="renderInv()"></div>
+  <div class="filter-row">
+    <div class="chip active" data-f="ALL" onclick="setFilter(this)">전체</div>
+    <div class="chip" data-f="A" onclick="setFilter(this)">🟢 A등급</div>
+    <div class="chip" data-f="B" onclick="setFilter(this)">🔵 B등급</div>
+    <div class="chip" data-f="C" onclick="setFilter(this)">⚪ C등급</div>
+    <div class="chip" data-f="WARN" onclick="setFilter(this)">⚠️ 주의필요</div>
+  </div>
+  <div class="inv-list" id="inv-list"></div>
+  <div class="page-info" id="page-info"></div>
+  <div class="load-more" id="load-more" onclick="loadMore()">더 보기 ▼</div>
+</div>
+
+<!-- AUDIT PAGE -->
+<div class="page" id="page-audit">
+  <div class="inner-tabs">
+    <div class="itab active" onclick="switchAudit('log')">📋 전체 이력</div>
+    <div class="itab" onclick="switchAudit('mm')">불일치 내역</div>
+  </div>
+  <div id="audit-log"><div class="audit-list" id="audit-list"><div style="color:var(--text2);text-align:center;padding:22px;font-size:12px">아직 입출고 내역이 없습니다.</div></div></div>
+  <div id="audit-mm" style="display:none"><div class="audit-list" id="mm-list"><div style="color:var(--text2);text-align:center;padding:22px;font-size:12px">불일치 내역이 없습니다. </div></div></div>
+</div>
+
+<!-- MODAL: 입고 -->
+<div class="modal-overlay" id="m-in">
+  <div class="modal">
+    <div class="modal-title">입고 처리</div>
+    <div class="modal-sub" id="m-in-sub"></div>
+    <div class="modal-field"><label>입고 수량 (EA)</label><input type="number" id="m-in-qty" placeholder="수량 입력" min="1"></div>
+    <div class="modal-btns"><button class="modal-btn mb-cancel" onclick="closeM('m-in')">취소</button><button class="modal-btn mb-in" onclick="doIn()">입고 확인</button></div>
+  </div>
+</div>
+<!-- MODAL: 출고 -->
+<div class="modal-overlay" id="m-out">
+  <div class="modal">
+    <div class="modal-title">출고 처리</div>
+    <div class="modal-sub" id="m-out-sub"></div>
+    <div class="modal-field"><label>출고 수량 (EA)</label><input type="number" id="m-out-qty" placeholder="수량 입력" min="1"></div>
+    <div class="modal-btns"><button class="modal-btn mb-cancel" onclick="closeM('m-out')">취소</button><button class="modal-btn mb-out" onclick="doOut()">출고 확인</button></div>
+  </div>
+</div>
+<!-- MODAL: 불량 -->
+<div class="modal-overlay" id="m-loss">
+  <div class="modal">
+    <div class="modal-title">🔴 불량/파손 처리</div>
+    <div class="modal-sub" id="m-loss-sub"></div>
+    <div class="modal-field"><label>불량/파손 수량 (EA)</label><input type="number" id="m-loss-qty" placeholder="수량 입력" min="1"></div>
+    <div class="modal-field"><label>사유 코드 (필수)</label>
+      <select id="m-loss-reason"><option value="">사유를 선택하세요</option><option value="RC-01 생산 중 파손/불량">RC-01 생산 중 파손/불량</option><option value="RC-02 입고 수량 오입력">RC-02 입고 수량 오입력</option><option value="RC-03 스캔 누락">RC-03 작업자 스캔 누락</option><option value="RC-04 원인 불명">RC-04 원인 불명 (조사필요)</option></select>
+    </div>
+    <div class="modal-btns"><button class="modal-btn mb-cancel" onclick="closeM('m-loss')">취소</button><button class="modal-btn mb-loss" onclick="doLoss()">기록 및 차감</button></div>
+  </div>
+</div>
+<!-- MODAL: 재고보정 -->
+<div class="modal-overlay" id="m-fix">
+  <div class="modal">
+    <div class="modal-title">재고 보정</div>
+    <div class="modal-sub" id="m-fix-sub"></div>
+    <div class="modal-field"><label>실사 확인 수량 (EA)</label><input type="number" id="m-fix-qty" placeholder="실제 랙에 있는 수량" min="0"></div>
+    <div class="modal-field"><label>보정 사유 (필수)</label>
+      <select id="m-fix-reason"><option value="">반드시 선택하세요</option><option value="RC-01 생산 중 파손/불량">RC-01 생산 중 파손/불량</option><option value="RC-02 입고 수량 오입력">RC-02 입고 수량 오입력</option><option value="RC-03 스캔 누락">RC-03 작업자 스캔 누락</option><option value="RC-04 원인 불명">RC-04 원인 불명 (조사필요)</option></select>
+    </div>
+    <div class="modal-btns"><button class="modal-btn mb-cancel" onclick="closeM('m-fix')">취소</button><button class="modal-btn mb-fix" onclick="doFix()">보정 승인 및 기록</button></div>
+  </div>
+</div>
+
+<!-- MODAL: 영점 크로스 체크 -->
+<div class="modal-overlay" id="m-zero">
+  <div class="modal">
+    <div class="modal-title">영점 크로스 체크</div>
+    <div class="modal-sub" id="m-zero-sub"></div>
+    <div style="font-size:12px;color:var(--text2);margin-bottom:14px">전산 재고가 0입니다. 실제 랙이 완전히 비어있습니까?</div>
+    <div class="modal-btns">
+      <button class="modal-btn mb-cancel" onclick="zeroCheckNo()">아니오 (실물 남아있음)</button>
+      <button class="modal-btn mb-in" onclick="zeroCheckYes()">예, 비어있음</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: 재고 소진 신고 -->
+<div class="modal-overlay" id="m-empty">
+  <div class="modal">
+    <div class="modal-title">재고 소진 신고</div>
+    <div class="modal-sub" id="m-empty-sub"></div>
+    <div style="font-size:12px;color:var(--text2);margin-bottom:14px">실제 랙이 비어있습니까?<br>확인 시 불일치 내역에 기록되고 전산 재고가 0으로 보정됩니다.</div>
+    <div class="modal-btns">
+      <button class="modal-btn mb-cancel" onclick="closeM('m-empty')">취소</button>
+      <button class="modal-btn mb-out" onclick="doEmpty()">재고 소진 확인</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ===== DATA =====
+const RAW=[{"barcode": "MAT0000", "slot": "J-01", "name": "무지 카톤박스", "category": "카톤박스", "vendor": "무지", "grade": "A", "freq": 0, "sub_materials": [{"name": "무지 카톤박스", "stock": 0, "safety_stock": 50, "txLog": []}]}, {"barcode": "MAT0001", "slot": "J-02", "name": "무지 카톤박스", "category": "카톤박스", "vendor": "무지", "grade": "A", "freq": 0, "sub_materials": [{"name": "무지 카톤박스", "stock": 0, "safety_stock": 50, "txLog": []}]}, {"barcode": "MAT0002", "slot": "J-03", "name": "무지 카톤박스", "category": "카톤박스", "vendor": "무지", "grade": "A", "freq": 0, "sub_materials": [{"name": "무지 카톤박스", "stock": 0, "safety_stock": 50, "txLog": []}]}, {"barcode": "MAT0003", "slot": "J-04", "name": "무지 카톤박스", "category": "카톤박스", "vendor": "무지", "grade": "A", "freq": 0, "sub_materials": [{"name": "무지 카톤박스", "stock": 0, "safety_stock": 50, "txLog": []}]}, {"barcode": "MAT0004", "slot": "J-05", "name": "차모스 카톤박스", "category": "카톤박스", "vendor": "차모스", "grade": "A", "freq": 0, "sub_materials": [{"name": "차모스 카톤박스", "stock": 0, "safety_stock": 50, "txLog": []}]}, {"barcode": "MAT0005", "slot": "J-06", "name": "차모스 카톤박스", "category": "카톤박스", "vendor": "차모스", "grade": "A", "freq": 0, "sub_materials": [{"name": "차모스 카톤박스", "stock": 0, "safety_stock": 50, "txLog": []}]}, {"barcode": "MAT0006", "slot": "J-07", "name": "차모스 카톤박스", "category": "카톤박스", "vendor": "차모스", "grade": "A", "freq": 0, "sub_materials": [{"name": "차모스 카톤박스", "stock": 0, "safety_stock": 50, "txLog": []}]}, {"barcode": "MAT0007", "slot": "J-08", "name": "s사 카톤박스", "category": "카톤박스", "vendor": "영진그린식품", "grade": "A", "freq": 0, "sub_materials": [{"name": "s사 카톤박스", "stock": 0, "safety_stock": 50, "txLog": []}]}, {"barcode": "MAT0008", "slot": "J-14", "name": "내몸은육두구토너", "category": "토너/로션류", "vendor": "저먼유로", "grade": "A", "freq": 211, "sub_materials": [{"name": "단상자", "stock": 65666, "safety_stock": 50, "txLog": []}, {"name": "라벨", "stock": 31190, "safety_stock": 50, "txLog": []}, {"name": "스프레이", "stock": 36200, "safety_stock": 50, "txLog": []}, {"name": "용기", "stock": 65666, "safety_stock": 50, "txLog": []}]}, {"barcode": "MAT0009", "slot": "J-11", "name": "엠비에스크림", "category": "크림류", "vendor": "저먼유로", "grade": "A", "freq": 72, "sub_materials": [{"name": "단상자", "stock": 65666, "safety_stock": 50, "txLog": []}, {"name": "뚜껑", "stock": 19266, "safety_stock": 50, "txLog": []}, {"name": "리드", "stock": 9716, "safety_stock": 50, "txLog": []}, {"name": "용기", "stock": 75268, "safety_stock": 50, "txLog": []}]}, {"barcode": "MAT0010", "slot": "J-12", "name": "차모스아가시스네일리페어안티링클크림", "category": "크림류", "vendor": "차모스", "grade": "A", "freq": 59, "sub_materials": [{"name": "단상자", "stock": 28159, "safety_stock": 50, "txLog": []}, {"name": "뚜껑", "stock": 18740, "safety_stock": 50, "txLog": []}, {"name": "리드", "stock": 12433, "safety_stock": 50, "txLog": []}, {"name": "용기", "stock": 20019, "safety_stock": 50, "txLog": []}]}, {"barcode": "MAT0011", "slot": "J-15", "name": "셀롱퍼펙트미스트세럼", "category": "세럼/앰플류", "vendor": "저먼유로", "grade": "A", "freq": 56, "sub_materials": [{"name": "단상자", "stock": 65666, "safety_stock": 50, "txLog": []}, {"name": "용기", "stock": 65666, "safety_stock": 50, "txLog": []}, {"name": "펌프", "stock": 250, "safety_stock": 50, "txLog": []}]}, {"barcode": "MAT0012", "slot": "J-13", "name": "그라티아수알로에젤", "category": "젤류", "vendor": "더에스제이", "grade": "A", "freq": 53, "sub_materials": [{"name": "단상자", "stock": 2006, "safety_stock": 50, "txLog": []}, {"name": "뚜껑", "stock": 259190, "safety_stock": 50, "txLog": []}, {"name": "용기", "stock": 9007, "safety_stock": 50, "txLog": []}, {"name": "튜브", "stock": 1147, "safety_stock": 50, "txLog": []}, {"name": "펌프", "stock": 1050, "safety_stock": 50, "txLog": []}]}, {"barcode": "MAT0013", "slot": "J-17", "name": "솔테라피유칼립투스솔트앤오일바디스크럽우디브리즈", "category": "바디스크럽류", "vendor": "영진그린식품", "grade": "A", "freq": 41, "sub_materials": [{"name": "파우치", "stock": 50400, "safety_stock": 50, "txLog": []}, {"name": "POP라벨", "stock": 44000, "safety_stock": 50, "txLog": []}, {"name": "C/T Box", "stock": 3000, "safety_stock": 50, "txLog": []}]}, {"barcode": "MAT0014", "slot": "J-16", "name": "솔테라피허니솔트앤오일바디스크럽시트러스블라썸", "category": "바디스크럽류", "vendor": "솔테라피", "grade": "A", "freq": 41, "sub_materials": [{"name": "뚜껑", "stock": 259190, "safety_stock": 50, "txLog": []}, {"name": "슬리브", "stock": 238600, "safety_stock": 50, "txLog": []}, {"name": "파우치", "stock": 50400, "safety_stock": 50, "txLog": []}]}, {"barcode": "MAT0015", "slot": "J-10", "name": "솔테라피라이스솔트앤오일바디스크럽듀이자스민", "category": "바디스크럽류", "vendor": "영진그린식품", "grade": "A", "freq": 39, "sub_materials": [{"name": "파우치", "stock": 50400, "safety_stock": 50, "txLog": []}, {"name": "POP라벨", "stock": 44000, "safety_stock": 50, "txLog": []}, {"name": "C/T Box", "stock": 3000, "safety_stock": 50, "txLog": []}]}, {"barcode": "MAT0016", "slot": "J-19", "name": "매직오일씨엘엘 \"셀룰라이트(적)\"", "category": "오일류", "vendor": "더에스제이", "grade": "A", "freq": 37, "sub_materials": [{"name": "뚜껑", "stock": 18740, "safety_stock": 50, "txLog": []}, {"name": "스펀지", "stock": 0, "safety_stock": 50, "txLog": []}, {"name": "실링지", "stock": 0, "safety_stock": 50, "txLog": []}, {"name": "용기", "stock": 17150, "safety_stock": 50, "txLog": []}]}, {"barcode": "MAT0017", "slot": "J-18", "name": "시드물알로에에센셜수딩마스크팩", "category": "마스크팩류", "vendor": "시드물", "grade": "A", "freq": 33, "sub_materials": [{"name": "부직포", "stock": 389080, "safety_stock": 50, "txLog": []}, {"name": "파우치", "stock": 184787, "safety_stock": 50, "txLog": []}]}, {"barcode": "MAT0018", "slot": "J-09", "name": "C&S50ml공용크림", "category": "크림류", "vendor": "C&S", "grade": "A", "freq": 32, "sub_materials": [{"name": "리드", "stock": 5400, "safety_stock": 50, "txLog": []}, {"name": "스푼", "stock": 5400, "safety_stock": 50, "txLog": []}, {"name": "용기", "stock": 400, "safety_stock": 50, "txLog": []}]}, {"barcode": "MAT0019", "slot": "A-03", "name": "솔테라피머그워트솔트앤오일바디스크럽그린로즈", "category": "바디스크럽류", "vendor": "영진그린식품", "grade": "A", "freq": 31, "sub_materials": [{"name": "파우치", "stock": 50400, "safety_stock": 50, "txLog": []}, {"name": "POP라벨", "stock": 44000, "safety_stock": 50, "txLog": []}, {"name": "C/T Box", "stock": 3000, "safety_stock": 50, "txLog": []}]}, {"barcode": "MAT0020", "slot": "B-01", "name": "차모스아가시몬스터풋필링팩", "category": "풋팩/패치류", "vendor": "차모스", "grade": "A", "freq": 30, "sub_materials": [{"name": "부직포", "stock": 389080, "safety_stock": 50, "txLog": []}, {"name": "파우치", "stock": 321179, "safety_stock": 50, "txLog": []}, {"name": "필름", "stock": 101281, "safety_stock": 50, "txLog": []}]}, {"barcode": "MAT0021", "slot": "B-11", "name": "매직오일알엘엑스 \"릴렉싱(황)\"", "category": "오일류", "vendor": "더에스제이", "grade": "B", "freq": 27, "sub_materials": [{"name": "뚜껑", "stock": 21740, "safety_stock": 30, "txLog": []}, {"name": "스펀지", "stock": 0, "safety_stock": 30, "txLog": []}, {"name": "실링지", "stock": 0, "safety_stock": 30, "txLog": []}, {"name": "용기", "stock": 17150, "safety_stock": 30, "txLog": []}]}, {"barcode": "MAT0022", "slot": "B-02", "name": "히니지니59달마크림", "category": "크림류", "vendor": "차모스", "grade": "B", "freq": 25, "sub_materials": [{"name": "단상자", "stock": 25309, "safety_stock": 30, "txLog": []}, {"name": "뚜껑", "stock": 17940, "safety_stock": 30, "txLog": []}, {"name": "라벨", "stock": 6665, "safety_stock": 30, "txLog": []}, {"name": "리드", "stock": 11633, "safety_stock": 30, "txLog": []}, {"name": "스푼", "stock": 10000, "safety_stock": 30, "txLog": []}, {"name": "용기", "stock": 20019, "safety_stock": 30, "txLog": []}]}, {"barcode": "MAT0023", "slot": "B-21", "name": "그라티아수비타하이드레이팅크림", "category": "크림류", "vendor": "더에스제이", "grade": "B", "freq": 24, "sub_materials": [{"name": "뚜껑", "stock": 259190, "safety_stock": 30, "txLog": []}, {"name": "리드", "stock": 12433, "safety_stock": 30, "txLog": []}, {"name": "용기", "stock": 23019, "safety_stock": 30, "txLog": []}]}, {"barcode": "MAT0024", "slot": "C-25", "name": "매직오일슬리밍 \"청\"", "category": "오일류", "vendor": "더에스제이", "grade": "B", "freq": 24, "sub_materials": [{"name": "뚜껑", "stock": 18740, "safety_stock": 30, "txLog": []}, {"name": "스펀지", "stock": 0, "safety_stock": 30, "txLog": []}, {"name": "실링지", "stock": 0, "safety_stock": 30, "txLog": []}, {"name": "용기", "stock": 17150, "safety_stock": 30, "txLog": []}]}, {"barcode": "MAT0025", "slot": "B-03", "name": "차모스아가시홍삼육두구에너지마스크팩", "category": "마스크팩류", "vendor": "차모스", "grade": "B", "freq": 20, "sub_materials": [{"name": "부직포", "stock": 389080, "safety_stock": 30, "txLog": []}, {"name": "파우치", "stock": 299279, "safety_stock": 30, "txLog": []}]}, {"barcode": "MAT0026", "slot": "B-22", "name": "그라티아수알로에스킨", "category": "토너/로션류", "vendor": "더에스제이", "grade": "B", "freq": 20, "sub_materials": [{"name": "라벨", "stock": 44000, "safety_stock": 30, "txLog": []}, {"name": "용기", "stock": 9007, "safety_stock": 30, "txLog": []}, {"name": "펌프", "stock": 1050, "safety_stock": 30, "txLog": []}]}, {"barcode": "MAT0027", "slot": "B-12", "name": "히니지니59달마샤이니매직세럼", "category": "세럼/앰플류", "vendor": "차모스", "grade": "B", "freq": 20, "sub_materials": [{"name": "단상자", "stock": 28159, "safety_stock": 30, "txLog": []}, {"name": "뚜껑", "stock": 259190, "safety_stock": 30, "txLog": []}, {"name": "용기", "stock": 65666, "safety_stock": 30, "txLog": []}, {"name": "펌프", "stock": 120, "safety_stock": 30, "txLog": []}]}, {"barcode": "MAT0028", "slot": "A-02", "name": "솔티라이스바디스크럽", "category": "바디스크럽류", "vendor": "영진그린식품", "grade": "B", "freq": 17, "sub_materials": [{"name": "뚜껑", "stock": 259190, "safety_stock": 30, "txLog": []}, {"name": "용기", "stock": 23019, "safety_stock": 30, "txLog": []}]}, {"barcode": "MAT0029", "slot": "A-05", "name": "솔티허니바디스크럽", "category": "바디스크럽류", "vendor": "영진그린식품", "grade": "B", "freq": 17, "sub_materials": [{"name": "뚜껑", "stock": 259190, "safety_stock": 30, "txLog": []}, {"name": "용기", "stock": 20019, "safety_stock": 30, "txLog": []}]}, {"barcode": "MAT0030", "slot": "B-13", "name": "차모스아가시스파클링버블마스크팩", "category": "마스크팩류", "vendor": "차모스", "grade": "B", "freq": 16, "sub_materials": [{"name": "부직포", "stock": 389080, "safety_stock": 30, "txLog": []}, {"name": "파우치", "stock": 299279, "safety_stock": 30, "txLog": []}]}, {"barcode": "MAT0031", "slot": "C-26", "name": "알로에베라겔플러스", "category": "젤류", "vendor": "인조이랩", "grade": "B", "freq": 16, "sub_materials": [{"name": "단상자", "stock": 1500, "safety_stock": 30, "txLog": []}, {"name": "튜브", "stock": 264, "safety_stock": 30, "txLog": []}]}, {"barcode": "MAT0032", "slot": "B-04", "name": "블랑센어성초추출물토너", "category": "토너/로션류", "vendor": "차모스", "grade": "B", "freq": 16, "sub_materials": [{"name": "단상자", "stock": 31159, "safety_stock": 30, "txLog": []}, {"name": "뚜껑", "stock": 19740, "safety_stock": 30, "txLog": []}, {"name": "라벨", "stock": 6665, "safety_stock": 30, "txLog": []}, {"name": "로션패킹", "stock": 0, "safety_stock": 30, "txLog": []}, {"name": "용기", "stock": 20019, "safety_stock": 30, "txLog": []}]}, {"barcode": "MAT0033", "slot": "A-04", "name": "시드물모공탄력마스크팩", "category": "마스크팩류", "vendor": "시드물", "grade": "B", "freq": 15, "sub_materials": [{"name": "부직포", "stock": 389080, "safety_stock": 30, "txLog": []}, {"name": "파우치", "stock": 185187, "safety_stock": 30, "txLog": []}]}, {"barcode": "MAT0034", "slot": "B-14", "name": "블랑센병풀추출물90토너", "category": "토너/로션류", "vendor": "차모스", "grade": "C", "freq": 12, "sub_materials": [{"name": "단상자", "stock": 31159, "safety_stock": 10, "txLog": []}, {"name": "뚜껑", "stock": 19740, "safety_stock": 10, "txLog": []}, {"name": "라벨", "stock": 6665, "safety_stock": 10, "txLog": []}, {"name": "로션패킹", "stock": 0, "safety_stock": 10, "txLog": []}, {"name": "용기", "stock": 20019, "safety_stock": 10, "txLog": []}]}, {"barcode": "MAT0035", "slot": "B-23", "name": "그라티아수Q10마사지크림", "category": "크림류", "vendor": "더에스제이", "grade": "C", "freq": 12, "sub_materials": [{"name": "뚜껑", "stock": 1840, "safety_stock": 10, "txLog": []}, {"name": "라벨", "stock": 6665, "safety_stock": 10, "txLog": []}, {"name": "리드", "stock": 12433, "safety_stock": 10, "txLog": []}, {"name": "용기", "stock": 9007, "safety_stock": 10, "txLog": []}]}, {"barcode": "MAT0036", "slot": "C-27", "name": "올리베타에너지샴푸", "category": "샴푸/바디류", "vendor": "비마트", "grade": "C", "freq": 11, "sub_materials": [{"name": "뚜껑", "stock": 0, "safety_stock": 10, "txLog": []}, {"name": "라벨", "stock": 1335, "safety_stock": 10, "txLog": []}, {"name": "용기", "stock": 17150, "safety_stock": 10, "txLog": []}, {"name": "파우치", "stock": 0, "safety_stock": 10, "txLog": []}, {"name": "펌프", "stock": 0, "safety_stock": 10, "txLog": []}]}, {"barcode": "MAT0037", "slot": "B-05", "name": "차모스아가시콜라겐리페어실크마스크팩", "category": "마스크팩류", "vendor": "차모스", "grade": "C", "freq": 9, "sub_materials": [{"name": "부직포", "stock": 389080, "safety_stock": 10, "txLog": []}, {"name": "파우치", "stock": 338479, "safety_stock": 10, "txLog": []}]}, {"barcode": "MAT0038", "slot": "A-01", "name": "윙클포스멀티크림", "category": "크림류", "vendor": "셀바이셀", "grade": "C", "freq": 9, "sub_materials": [{"name": "단상자", "stock": 100, "safety_stock": 10, "txLog": []}, {"name": "뚜껑", "stock": 1840, "safety_stock": 10, "txLog": []}, {"name": "튜브", "stock": 1840, "safety_stock": 10, "txLog": []}]}, {"barcode": "MAT0039", "slot": "B-24", "name": "블랑센녹두추출물90토너", "category": "토너/로션류", "vendor": "차모스", "grade": "C", "freq": 9, "sub_materials": [{"name": "단상자", "stock": 31159, "safety_stock": 10, "txLog": []}, {"name": "뚜껑", "stock": 19740, "safety_stock": 10, "txLog": []}, {"name": "라벨", "stock": 6665, "safety_stock": 10, "txLog": []}, {"name": "로션패킹", "stock": 0, "safety_stock": 10, "txLog": []}, {"name": "용기", "stock": 20019, "safety_stock": 10, "txLog": []}]}, {"barcode": "MAT0040", "slot": "B-25", "name": "히니지니소프트풋필링팩", "category": "풋팩/패치류", "vendor": "차모스", "grade": "C", "freq": 8, "sub_materials": [{"name": "부직포", "stock": 0, "safety_stock": 10, "txLog": []}, {"name": "파우치", "stock": 308079, "safety_stock": 10, "txLog": []}, {"name": "필름", "stock": 101281, "safety_stock": 10, "txLog": []}]}, {"barcode": "MAT0041", "slot": "A-08", "name": "에메랄드퀸프리미엄로즈오일", "category": "오일류", "vendor": "에메랄드퀸", "grade": "C", "freq": 7, "sub_materials": [{"name": "단상자", "stock": 2021, "safety_stock": 10, "txLog": []}, {"name": "용기", "stock": 17150, "safety_stock": 10, "txLog": []}, {"name": "펌프", "stock": 3050, "safety_stock": 10, "txLog": []}]}, {"barcode": "MAT0042", "slot": "C-01", "name": "히니지니59달마마스크팩", "category": "마스크팩류", "vendor": "차모스", "grade": "C", "freq": 6, "sub_materials": [{"name": "부직포", "stock": 12, "safety_stock": 10, "txLog": []}, {"name": "파우치", "stock": 185187, "safety_stock": 10, "txLog": []}]}, {"barcode": "MAT0043", "slot": "A-11", "name": "자현윤슬토너", "category": "토너/로션류", "vendor": "인터셀바이오", "grade": "C", "freq": 6, "sub_materials": [{"name": "뚜껑", "stock": 40, "safety_stock": 10, "txLog": []}, {"name": "용기", "stock": 960, "safety_stock": 10, "txLog": []}, {"name": "펌프", "stock": 40, "safety_stock": 10, "txLog": []}]}, {"barcode": "MAT0044", "slot": "A-10", "name": "자현너울로션", "category": "토너/로션류", "vendor": "인터셀바이오", "grade": "C", "freq": 6, "sub_materials": [{"name": "뚜껑", "stock": 21740, "safety_stock": 10, "txLog": []}, {"name": "용기", "stock": 960, "safety_stock": 10, "txLog": []}, {"name": "펌프", "stock": 40, "safety_stock": 10, "txLog": []}]}, {"barcode": "MAT0045", "slot": "A-12", "name": "비비야블레이쉬아웃수딩세럼", "category": "세럼/앰플류", "vendor": "비비야", "grade": "C", "freq": 6, "sub_materials": [{"name": "단상자", "stock": 923, "safety_stock": 10, "txLog": []}, {"name": "라벨", "stock": 6665, "safety_stock": 10, "txLog": []}, {"name": "용기", "stock": 23019, "safety_stock": 10, "txLog": []}, {"name": "펌프", "stock": 120, "safety_stock": 10, "txLog": []}]}, {"barcode": "MAT0046", "slot": "B-15", "name": "에닐로얄제리마스크팩", "category": "마스크팩류", "vendor": "차모스", "grade": "C", "freq": 5, "sub_materials": [{"name": "부직포", "stock": 389080, "safety_stock": 10, "txLog": []}, {"name": "파우치", "stock": 184787, "safety_stock": 10, "txLog": []}]}, {"barcode": "MAT0047", "slot": "C-02", "name": "차모스아가시포어리스클리어클렌징오일", "category": "선크림/클렌징류", "vendor": "차모스", "grade": "C", "freq": 5, "sub_materials": [{"name": "수축필름", "stock": 0, "safety_stock": 10, "txLog": []}, {"name": "용기", "stock": 20019, "safety_stock": 10, "txLog": []}, {"name": "펌프", "stock": 120, "safety_stock": 10, "txLog": []}]}, {"barcode": "MAT0048", "slot": "A-07", "name": "솔티코코바디스크럽", "category": "바디스크럽류", "vendor": "영진그린식품", "grade": "C", "freq": 5, "sub_materials": [{"name": "뚜껑", "stock": 259190, "safety_stock": 10, "txLog": []}, {"name": "용기", "stock": 20019, "safety_stock": 10, "txLog": []}]}, {"barcode": "MAT0049", "slot": "A-06", "name": "엘리자베카스킨라이어모이스춰화이트닝크림", "category": "크림류", "vendor": "미즈", "grade": "C", "freq": 5, "sub_materials": [{"name": "튜브", "stock": 342, "safety_stock": 10, "txLog": []}, {"name": "C/T Box", "stock": 3000, "safety_stock": 10, "txLog": []}]}, {"barcode": "MAT0050", "slot": "B-06", "name": "뷰티밸런스마사지크림", "category": "크림류", "vendor": "이바롬", "grade": "C", "freq": 5, "sub_materials": [{"name": "뚜껑", "stock": 4840, "safety_stock": 10, "txLog": []}, {"name": "라벨", "stock": 6665, "safety_stock": 10, "txLog": []}, {"name": "수축필름", "stock": 0, "safety_stock": 10, "txLog": []}, {"name": "용기", "stock": 23019, "safety_stock": 10, "txLog": []}, {"name": "펌프", "stock": 0, "safety_stock": 10, "txLog": []}]}, {"barcode": "MAT0051", "slot": "B-26", "name": "차모스뉴셀큐어볼륨텐션리턴크림", "category": "크림류", "vendor": "차모스", "grade": "C", "freq": 4, "sub_materials": [{"name": "단상자", "stock": 29159, "safety_stock": 10, "txLog": []}, {"name": "튜브", "stock": 342, "safety_stock": 10, "txLog": []}]}, {"barcode": "MAT0052", "slot": "C-10", "name": "차모스아가시바이릴리아나피디알엔마스크", "category": "마스크팩류", "vendor": "차모스", "grade": "C", "freq": 3, "sub_materials": [{"name": "단상자", "stock": 28159, "safety_stock": 10, "txLog": []}, {"name": "파우치", "stock": 338479, "safety_stock": 10, "txLog": []}]}, {"barcode": "MAT0053", "slot": "C-09", "name": "미방매직오일릴렉스무향", "category": "오일류", "vendor": "더에스제이", "grade": "C", "freq": 3, "sub_materials": [{"name": "뚜껑", "stock": 18740, "safety_stock": 10, "txLog": []}, {"name": "스펀지", "stock": 0, "safety_stock": 10, "txLog": []}, {"name": "실링지", "stock": 0, "safety_stock": 10, "txLog": []}, {"name": "용기", "stock": 65666, "safety_stock": 10, "txLog": []}]}, {"barcode": "MAT0054", "slot": "B-07", "name": "피에이치로션", "category": "토너/로션류", "vendor": "이바롬", "grade": "C", "freq": 3, "sub_materials": [{"name": "라벨", "stock": 44000, "safety_stock": 10, "txLog": []}, {"name": "수축필름", "stock": 0, "safety_stock": 10, "txLog": []}, {"name": "용기", "stock": 9007, "safety_stock": 10, "txLog": []}, {"name": "펌프", "stock": 3050, "safety_stock": 10, "txLog": []}]}, {"barcode": "MAT0055", "slot": "C-17", "name": "그라티아수알로에콜라겐플루이드세럼", "category": "세럼/앰플류", "vendor": "더에스제이", "grade": "C", "freq": 3, "sub_materials": [{"name": "라벨", "stock": 44000, "safety_stock": 10, "txLog": []}, {"name": "용기", "stock": 9007, "safety_stock": 10, "txLog": []}, {"name": "펌프", "stock": 1050, "safety_stock": 10, "txLog": []}]}, {"barcode": "MAT0056", "slot": "C-03", "name": "차모스아가시스네일래디언스유스오일드롭7에멀젼", "category": "세럼/앰플류", "vendor": "차모스", "grade": "C", "freq": 3, "sub_materials": [{"name": "단상자", "stock": 28159, "safety_stock": 10, "txLog": []}, {"name": "라벨", "stock": 1335, "safety_stock": 10, "txLog": []}, {"name": "스포이드", "stock": 4008, "safety_stock": 10, "txLog": []}, {"name": "용기", "stock": 20019, "safety_stock": 10, "txLog": []}]}, {"barcode": "MAT0057", "slot": "B-27", "name": "차모스뉴셀큐어매직컬스팅스피큘크림", "category": "크림류", "vendor": "차모스", "grade": "C", "freq": 3, "sub_materials": [{"name": "내용기", "stock": 0, "safety_stock": 10, "txLog": []}, {"name": "단상자", "stock": 27159, "safety_stock": 10, "txLog": []}, {"name": "외용기", "stock": 0, "safety_stock": 10, "txLog": []}, {"name": "펌프", "stock": 120, "safety_stock": 10, "txLog": []}]}, {"barcode": "MAT0058", "slot": "A-09", "name": "팜케어워터드롭수분크림", "category": "크림류", "vendor": "인조이랩", "grade": "C", "freq": 3, "sub_materials": [{"name": "뚜껑", "stock": 18740, "safety_stock": 10, "txLog": []}, {"name": "라벨", "stock": 6665, "safety_stock": 10, "txLog": []}, {"name": "리드", "stock": 12433, "safety_stock": 10, "txLog": []}, {"name": "수축필름", "stock": 0, "safety_stock": 10, "txLog": []}, {"name": "용기", "stock": 20019, "safety_stock": 10, "txLog": []}]}, {"barcode": "MAT0059", "slot": "C-18", "name": "석고베이스크림", "category": "크림류", "vendor": "더에스제이", "grade": "C", "freq": 3, "sub_materials": [{"name": "뚜껑", "stock": 259190, "safety_stock": 10, "txLog": []}, {"name": "라벨", "stock": 6665, "safety_stock": 10, "txLog": []}, {"name": "리드", "stock": 9716, "safety_stock": 10, "txLog": []}, {"name": "용기", "stock": 23019, "safety_stock": 10, "txLog": []}]}, {"barcode": "MAT0060", "slot": "B-17", "name": "닥터트럽스킨리터닝아하10플러스마스크시트", "category": "마스크팩류", "vendor": "시드물", "grade": "C", "freq": 2, "sub_materials": [{"name": "부직포", "stock": 389080, "safety_stock": 10, "txLog": []}, {"name": "파우치", "stock": 50400, "safety_stock": 10, "txLog": []}]}, {"barcode": "MAT0061", "slot": "B-10", "name": "닥터유힐카밍마스크팩", "category": "마스크팩류", "vendor": "유힐바이오", "grade": "C", "freq": 2, "sub_materials": [{"name": "부직포", "stock": 389080, "safety_stock": 10, "txLog": []}, {"name": "파우치", "stock": 185187, "safety_stock": 10, "txLog": []}]}, {"barcode": "MAT0062", "slot": "C-12", "name": "블랑센데일리UV디펜스선크림", "category": "선크림/클렌징류", "vendor": "차모스", "grade": "C", "freq": 2, "sub_materials": [{"name": "단상자", "stock": 31159, "safety_stock": 10, "txLog": []}, {"name": "튜브", "stock": 342, "safety_stock": 10, "txLog": []}]}, {"barcode": "MAT0063", "slot": "B-16", "name": "차모스아가시스네일리페어안티링클아이크림", "category": "크림류", "vendor": "차모스", "grade": "C", "freq": 2, "sub_materials": [{"name": "단상자", "stock": 28159, "safety_stock": 10, "txLog": []}, {"name": "튜브", "stock": 342, "safety_stock": 10, "txLog": []}]}, {"barcode": "MAT0064", "slot": "B-18", "name": "졸리떼르뷰티퓨어클렌징젤", "category": "선크림/클렌징류", "vendor": "졸리떼르", "grade": "C", "freq": 2, "sub_materials": [{"name": "라벨", "stock": 1335, "safety_stock": 10, "txLog": []}]}, {"barcode": "MAT0065", "slot": "B-08", "name": "퓨리파잉씨밸런스크림", "category": "크림류", "vendor": "셀바이셀", "grade": "C", "freq": 2, "sub_materials": [{"name": "뚜껑", "stock": 4840, "safety_stock": 10, "txLog": []}, {"name": "튜브", "stock": 4840, "safety_stock": 10, "txLog": []}]}, {"barcode": "MAT0066", "slot": "C-07", "name": "샴푸", "category": "샴푸/바디류", "vendor": "비마트", "grade": "C", "freq": 2, "sub_materials": [{"name": "파우치", "stock": 6756, "safety_stock": 10, "txLog": []}]}, {"barcode": "MAT0067", "slot": "C-11", "name": "꿀피부여유마스크팩", "category": "마스크팩류", "vendor": "차모스", "grade": "C", "freq": 2, "sub_materials": [{"name": "부직포", "stock": 389080, "safety_stock": 10, "txLog": []}, {"name": "파우치", "stock": 50400, "safety_stock": 10, "txLog": []}, {"name": "펄지", "stock": 9600, "safety_stock": 10, "txLog": []}]}, {"barcode": "MAT0068", "slot": "C-04", "name": "차모스아가시슬림브이핏턱케어패치", "category": "풋팩/패치류", "vendor": "차모스", "grade": "C", "freq": 2, "sub_materials": [{"name": "부직포", "stock": 389080, "safety_stock": 10, "txLog": []}, {"name": "파우치", "stock": 338479, "safety_stock": 10, "txLog": []}, {"name": "펄지", "stock": 389080, "safety_stock": 10, "txLog": []}]}, {"barcode": "MAT0069", "slot": "B-09", "name": "강호정에센스", "category": "세럼/앰플류", "vendor": "강호정", "grade": "C", "freq": 2, "sub_materials": [{"name": "뚜껑", "stock": 19740, "safety_stock": 10, "txLog": []}, {"name": "용기", "stock": 2, "safety_stock": 10, "txLog": []}]}, {"barcode": "MAT0070", "slot": "C-08", "name": "스템셀세럼", "category": "세럼/앰플류", "vendor": "비마트", "grade": "C", "freq": 2, "sub_materials": [{"name": "용기", "stock": 65666, "safety_stock": 10, "txLog": []}, {"name": "펌프", "stock": 250, "safety_stock": 10, "txLog": []}]}, {"barcode": "MAT0071", "slot": "C-06", "name": "chamosACACINIACINMIDEBRIGHTENING&MOISTURIZINGAMPOULEMASK", "category": "마스크팩류", "vendor": "차모스", "grade": "C", "freq": 1, "sub_materials": [{"name": "단상자", "stock": 29159, "safety_stock": 10, "txLog": []}, {"name": "파우치", "stock": 321179, "safety_stock": 10, "txLog": []}]}, {"barcode": "MAT0072", "slot": "C-19", "name": "차모스아가시스페셜사과후르츠클렌징폼", "category": "선크림/클렌징류", "vendor": "차모스", "grade": "C", "freq": 1, "sub_materials": [{"name": "단상자", "stock": 31159, "safety_stock": 10, "txLog": []}, {"name": "라벨", "stock": 1335, "safety_stock": 10, "txLog": []}, {"name": "튜브", "stock": 342, "safety_stock": 10, "txLog": []}]}, {"barcode": "MAT0073", "slot": "C-05", "name": "블랑센어성초맑은소금바디스크럽", "category": "바디스크럽류", "vendor": "차모스", "grade": "C", "freq": 1, "sub_materials": [{"name": "뚜껑", "stock": 259190, "safety_stock": 10, "txLog": []}, {"name": "파우치", "stock": 50400, "safety_stock": 10, "txLog": []}]}, {"barcode": "MAT0074", "slot": "C-20", "name": "블랑센홍삼맑은소금바디스크럽", "category": "바디스크럽류", "vendor": "차모스", "grade": "C", "freq": 1, "sub_materials": [{"name": "뚜껑", "stock": 259190, "safety_stock": 10, "txLog": []}, {"name": "파우치", "stock": 50400, "safety_stock": 10, "txLog": []}]}, {"barcode": "MAT0075", "slot": "C-16", "name": "더에스제이_예비1", "category": "예비슬롯", "vendor": "더에스제이", "grade": "C", "freq": 0, "sub_materials": [{"name": "(예비 공간)", "stock": 0, "safety_stock": 0, "txLog": []}]}, {"barcode": "MAT0076", "slot": "C-15", "name": "더에스제이_예비2", "category": "예비슬롯", "vendor": "더에스제이", "grade": "C", "freq": 0, "sub_materials": [{"name": "(예비 공간)", "stock": 0, "safety_stock": 0, "txLog": []}]}, {"barcode": "MAT0077", "slot": "C-23", "name": "더에스제이_예비3", "category": "예비슬롯", "vendor": "더에스제이", "grade": "C", "freq": 0, "sub_materials": [{"name": "(예비 공간)", "stock": 0, "safety_stock": 0, "txLog": []}]}, {"barcode": "MAT0078", "slot": "C-24", "name": "비마트_예비1", "category": "예비슬롯", "vendor": "비마트", "grade": "C", "freq": 0, "sub_materials": [{"name": "(예비 공간)", "stock": 0, "safety_stock": 0, "txLog": []}]}, {"barcode": "MAT0079", "slot": "C-22", "name": "시드물_예비1", "category": "예비슬롯", "vendor": "시드물", "grade": "C", "freq": 0, "sub_materials": [{"name": "(예비 공간)", "stock": 0, "safety_stock": 0, "txLog": []}]}, {"barcode": "MAT0080", "slot": "B-19", "name": "영진그린식품_예비1", "category": "예비슬롯", "vendor": "영진그린식품", "grade": "C", "freq": 0, "sub_materials": [{"name": "(예비 공간)", "stock": 0, "safety_stock": 0, "txLog": []}]}, {"barcode": "MAT0081", "slot": "B-20", "name": "영진그린식품_예비2", "category": "예비슬롯", "vendor": "영진그린식품", "grade": "C", "freq": 0, "sub_materials": [{"name": "(예비 공간)", "stock": 0, "safety_stock": 0, "txLog": []}]}, {"barcode": "MAT0082", "slot": "C-21", "name": "차모스_예비1", "category": "예비슬롯", "vendor": "차모스", "grade": "C", "freq": 0, "sub_materials": [{"name": "(예비 공간)", "stock": 0, "safety_stock": 0, "txLog": []}]}, {"barcode": "MAT0083", "slot": "C-14", "name": "차모스_예비2", "category": "예비슬롯", "vendor": "차모스", "grade": "C", "freq": 0, "sub_materials": [{"name": "(예비 공간)", "stock": 0, "safety_stock": 0, "txLog": []}]}, {"barcode": "MAT0084", "slot": "C-13", "name": "차모스_예비3", "category": "예비슬롯", "vendor": "차모스", "grade": "C", "freq": 0, "sub_materials": [{"name": "(예비 공간)", "stock": 0, "safety_stock": 0, "txLog": []}]}];
+
+// ===== STATE =====
+let data = RAW.map(d=>({...d, sub_materials: d.sub_materials.map(s=>({...s,txLog:[]}))}));
+let auditLog=[], mmLog=[];
+let curItem=null, curSubIdx=-1, curModalType='';
+let scanActive=false, invFilter='ALL', invPage=1;
+const PAGE=20;
+
+document.addEventListener('DOMContentLoaded',()=>{renderInv();});
+
+// ===== TABS =====
+function switchTab(t){
+  ['scan','inventory','audit'].forEach((n,i)=>{
+    document.querySelectorAll('.tab')[i].classList.toggle('active',n===t);
+    document.getElementById('page-'+n).classList.toggle('active',n===t);
+  });
+  if(t==='inventory')renderInv();
+  if(t==='audit')renderAudit();
+}
+function switchAudit(t){
+  document.querySelectorAll('.itab').forEach((el,i)=>el.classList.toggle('active',['log','mm'][i]===t));
+  document.getElementById('audit-log').style.display=t==='log'?'block':'none';
+  document.getElementById('audit-mm').style.display=t==='mm'?'block':'none';
+  renderAudit();
+}
+
+// ===== SCAN =====
+function toggleScan(){scanActive?stopScan():startScan();}
+function startScan(){
+  document.getElementById('scan-inactive').style.display='none';
+  Quagga.init({inputStream:{name:'Live',type:'LiveStream',target:document.getElementById('scanner-container'),constraints:{facingMode:'environment',width:{min:640},height:{min:480}}},decoder:{readers:['code_128_reader','ean_reader','code_39_reader']}},(err)=>{
+    if(err){toast('카메라 접근 실패. 직접 입력하세요.','err');document.getElementById('scan-inactive').style.display='flex';return;}
+    Quagga.start();scanActive=true;
+    const b=document.getElementById('scan-btn');b.textContent='⏹ 스캔 중지';b.classList.add('stop');
+    const ov=document.createElement('div');ov.className='scan-overlay';ov.innerHTML='<div class="scan-line"></div>';document.getElementById('scanner-container').appendChild(ov);
+  });
+  Quagga.onDetected(r=>{const c=r.codeResult.code;stopScan();document.getElementById('barcode-input').value=c;searchBarcode();});
+}
+function stopScan(){
+  if(!scanActive)return;Quagga.stop();scanActive=false;
+  document.getElementById('scan-inactive').style.display='flex';
+  const b=document.getElementById('scan-btn');b.textContent='📷 카메라 스캔 시작';b.classList.remove('stop');
+  const ov=document.querySelector('.scan-overlay');if(ov)ov.remove();
+}
+function qs(c){document.getElementById('barcode-input').value=c;searchBarcode();}
+function searchBarcode(){
+  const v=document.getElementById('barcode-input').value.trim().toUpperCase();
+  const item=data.find(d=>d.barcode===v||d.slot===v);
+  if(item)showProduct(item);
+  else document.getElementById('scan-result').innerHTML=`<div class="not-found"><div class="big"></div><p>"${v}" 바코드를 찾을 수 없습니다.</p></div>`;
+}
+
+// ===== SHOW PRODUCT =====
+function showProduct(item){
+  curItem=item;
+  // check warnings
+  const warnSubs=item.sub_materials.filter(s=>s.stock<=0);
+  const lowSubs=item.sub_materials.filter(s=>s.stock>0&&s.stock<s.safety_stock);
+  let warnHtml='';
+  if(warnSubs.length>0) warnHtml+=`<div class="warn-row">재고 없음: ${warnSubs.map(s=>s.name).join(', ')}</div>`;
+  if(lowSubs.length>0) warnHtml+=`<div class="caution-row">⚠️ 안전재고 이하: ${lowSubs.map(s=>s.name).join(', ')}</div>`;
+
+  // sub material table rows
+  const rows=item.sub_materials.map((s,i)=>{
+    const isEmpty=s.stock<=0, isLow=!isEmpty&&s.stock<s.safety_stock;
+    const sc=isEmpty?'stock-empty':isLow?'stock-low':'stock-ok';
+    const pct=Math.min(100,Math.max(0,(s.stock/Math.max(s.safety_stock*3,1))*100));
+    const bc=isEmpty?'#f85149':isLow?'#d29922':'#3fb950';
+    const zeroBtn=s.stock===0?`<button onclick="zeroCheck(${i})" style="display:block;width:100%;margin-top:4px;padding:4px;background:rgba(88,166,255,.15);border:1px solid var(--accent);border-radius:5px;font-size:10px;color:var(--accent);cursor:pointer;font-family:inherit">영점 확인</button>`:'';
+    return `<tr>
+      <td><b>${s.name}</b><br><span style="font-size:10px;color:var(--text2)">안전재고: ${s.safety_stock}</span>${zeroBtn}</td>
+      <td>
+        <div style="display:flex;align-items:center;gap:4px">
+          <span class="stock-val ${sc}">${s.stock.toLocaleString()}</span>
+          <span class="sub-bar"><span class="sub-bar-fill" style="width:${pct}%;background:${bc}"></span></span>
+        </div>
+      </td>
+      <td>
+        <div class="sub-actions">
+          <button class="sa-btn sa-in" onclick="openSub('in',${i})">입고</button>
+          <button class="sa-btn sa-out" onclick="openSub('out',${i})">출고</button>
+          <button class="sa-btn sa-loss" onclick="openSub('loss',${i})">불량</button>
+          <button class="sa-btn sa-fix" onclick="openSub('fix',${i})">보정</button>
+          <button class="sa-btn sa-empty" onclick="reportEmpty(${i})">재고소진</button>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('scan-result').innerHTML=`
+    <div class="product-card">
+      <div class="product-header">
+        <div class="product-name">${item.name}</div>
+        <div class="grade-badge grade-${item.grade}">${item.grade}</div>
+      </div>
+      ${warnHtml}
+      <div class="info-row">
+        <div class="info-chip"><span class="label">바코드</span><span class="val">${item.barcode}</span></div>
+        <div class="info-chip"><span class="label">보관위치</span><span class="val">${item.slot}</span></div>
+        <div class="info-chip"><span class="label">거래처</span><span class="val" style="font-family:inherit">${item.vendor}</span></div>
+        <div class="info-chip"><span class="label">분류</span><span class="val" style="font-family:inherit">${item.category}</span></div>
+      </div>
+      <div class="sub-title">부자재별 재고 현황 (${item.sub_materials.length}종)</div>
+      <table class="sub-table">
+        <colgroup><col><col><col></colgroup>
+        <thead><tr><th>부자재명</th><th>재고 (EA)</th><th>처리</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>`;
+}
+
+// ===== ZERO CHECK =====
+function zeroCheck(subIdx){
+  curSubIdx=subIdx;
+  const s=curItem.sub_materials[subIdx];
+  document.getElementById('m-zero-sub').textContent=curItem.name+' → ['+s.name+']';
+  document.getElementById('m-zero').classList.add('open');
+}
+function zeroCheckYes(){
+  const s=curItem.sub_materials[curSubIdx];
+  addAudit('zero_ok',curItem,s,0,'영점체크: 랙 비어있음 확인');
+  closeM('m-zero');
+  toast('영점 확인 — 정상 처리','ok');
+}
+function zeroCheckNo(){
+  const s=curItem.sub_materials[curSubIdx];
+  mmLog.unshift({time:getTime(),name:curItem.name,sub:s.name,slot:curItem.slot,sys:0,reason:'전산 0이나 실물 잔여'});
+  addAudit('mismatch',curItem,s,0,'영점 불일치 — 관리자 확인');
+  closeM('m-zero');
+  toast('불일치 신고됨! 로그 탭 확인','err');
+}
+
+// ===== 재고 소진 (실제 랙 먼저 빈 경우) =====
+function reportEmpty(subIdx){
+  curSubIdx=subIdx;
+  const s=curItem.sub_materials[subIdx];
+  document.getElementById('m-empty-sub').textContent=curItem.name+' → ['+s.name+'] 전산재고: '+s.stock.toLocaleString()+'EA';
+  document.getElementById('m-empty').classList.add('open');
+}
+function doEmpty(){
+  const s=curItem.sub_materials[curSubIdx];
+  const prev=s.stock;
+  mmLog.unshift({time:getTime(),name:curItem.name,sub:s.name,slot:curItem.slot,sys:prev,actual:0,diff:-prev,reason:'RC-03 작업자 스캔 누락 추정 (랙 소진)'});
+  s.stock=0;syncSub();
+  addTx(s,'empty',-prev);
+  addAudit('mismatch',curItem,s,-prev,'재고소진 신고 — 전산잔여 '+prev.toLocaleString()+'EA 오차');
+  closeM('m-empty');
+  showProduct(curItem);
+  toast('['+s.name+'] 재고 소진 신고됨. 불일치 기록','err');
+}
+
+// ===== MODAL =====
+function openSub(type,subIdx){
+  curSubIdx=subIdx;curModalType=type;
+  const s=curItem.sub_materials[subIdx];
+  const mid='m-'+type;
+  document.getElementById(mid+'-sub').textContent=`${curItem.name} → [${s.name}] 현재: ${s.stock}EA`;
+  if(type==='in'){document.getElementById('m-in-qty').value='';document.getElementById(mid).classList.add('open');setTimeout(()=>document.getElementById('m-in-qty').focus(),300);}
+  else if(type==='out'){document.getElementById('m-out-qty').value='';document.getElementById(mid).classList.add('open');setTimeout(()=>document.getElementById('m-out-qty').focus(),300);}
+  else if(type==='loss'){document.getElementById('m-loss-qty').value='';document.getElementById('m-loss-reason').value='';document.getElementById(mid).classList.add('open');setTimeout(()=>document.getElementById('m-loss-qty').focus(),300);}
+  else if(type==='fix'){document.getElementById('m-fix-qty').value='';document.getElementById('m-fix-reason').value='';document.getElementById('m-fix-sub').textContent=`${curItem.name} → [${s.name}] 전산: ${s.stock}EA → 실사 입력`;document.getElementById(mid).classList.add('open');setTimeout(()=>document.getElementById('m-fix-qty').focus(),300);}
+}
+function closeM(id){document.getElementById(id).classList.remove('open');}
+
+function doIn(){
+  const qty=parseInt(document.getElementById('m-in-qty').value);
+  if(!qty||qty<=0){toast('수량을 입력하세요','err');return;}
+  const s=curItem.sub_materials[curSubIdx];
+  s.stock+=qty;syncSub();addTx(s,'in',qty);addAudit('in',curItem,s,qty,'입고');
+  closeM('m-in');showProduct(curItem);toast(`[${s.name}] 입고 +${qty}EA`,'ok');
+}
+function doOut(){
+  const qty=parseInt(document.getElementById('m-out-qty').value);
+  if(!qty||qty<=0){toast('수량을 입력하세요','err');return;}
+  const s=curItem.sub_materials[curSubIdx];
+  const prev=s.stock; s.stock-=qty;syncSub();addTx(s,'out',qty);addAudit('out',curItem,s,qty,'출고');
+  if(prev>=s.safety_stock&&s.stock<s.safety_stock&&s.stock>0) setTimeout(()=>toast(`⚠️ [${s.name}] 안전재고 이하!`,'warn'),400);
+  closeM('m-out');showProduct(curItem);toast(`[${s.name}] 출고 -${qty}EA`,'ok');
+}
+function doLoss(){
+  const qty=parseInt(document.getElementById('m-loss-qty').value);
+  const reason=document.getElementById('m-loss-reason').value;
+  if(!qty||qty<=0){toast('수량을 입력하세요','err');return;}
+  if(!reason){toast('사유 코드를 선택하세요','err');return;}
+  const s=curItem.sub_materials[curSubIdx];
+  s.stock-=qty;syncSub();addTx(s,'loss',qty);addAudit('loss',curItem,s,qty,reason);
+  mmLog.unshift({time:getTime(),name:curItem.name,sub:s.name,slot:curItem.slot,qty,reason});
+  closeM('m-loss');showProduct(curItem);toast(`🔴 [${s.name}] 불량 -${qty}EA 기록`,'err');
+}
+function doFix(){
+  const qty=parseInt(document.getElementById('m-fix-qty').value);
+  const reason=document.getElementById('m-fix-reason').value;
+  if(isNaN(qty)||qty<0){toast('실사 수량을 입력하세요','err');return;}
+  if(!reason){toast('보정 사유를 선택하세요','err');return;}
+  const s=curItem.sub_materials[curSubIdx];
+  const diff=qty-s.stock;
+  mmLog.unshift({time:getTime(),name:curItem.name,sub:s.name,slot:curItem.slot,sys:s.stock,actual:qty,diff,reason});
+  s.stock=qty;syncSub();addTx(s,'fix',diff);addAudit('fix',curItem,s,diff,`보정(${reason})`);
+  closeM('m-fix');showProduct(curItem);toast(`[${s.name}] 보정 → ${qty}EA`,'warn');
+}
+
+// ===== HELPERS =====
+function syncSub(){const idx=data.findIndex(d=>d.barcode===curItem.barcode);if(idx!==-1)data[idx]=curItem;}
+function addTx(sub,type,qty){sub.txLog.push({time:getTime(),type,qty,after:sub.stock});if(sub.txLog.length>30)sub.txLog.shift();}
+function addAudit(type,item,sub,qty,note){auditLog.unshift({type,product:item.name,sub:sub.name,slot:item.slot,qty,note,time:getTime(),after:sub.stock});if(auditLog.length>100)auditLog.pop();}
+function getTime(){const n=new Date();return n.getHours().toString().padStart(2,'0')+':'+n.getMinutes().toString().padStart(2,'0')+':'+n.getSeconds().toString().padStart(2,'0');}
+function toast(msg,type){const t=document.getElementById('toast');t.textContent=msg;t.className='toast show '+(type||'');setTimeout(()=>t.classList.remove('show'),2800);}
+
+// ===== INVENTORY =====
+function setFilter(el){document.querySelectorAll('.chip').forEach(c=>c.classList.remove('active'));el.classList.add('active');invFilter=el.dataset.f;invPage=1;renderInv();}
+function hasWarn(item){return item.sub_materials.some(s=>s.stock<=0||s.stock<s.safety_stock);}
+function renderInv(){
+  const q=document.getElementById('inv-search').value.toLowerCase();
+  let list=data.filter(item=>{
+    const ms=!q||item.name.toLowerCase().includes(q)||item.vendor.toLowerCase().includes(q)||item.slot.toLowerCase().includes(q)||item.category.toLowerCase().includes(q)||item.barcode.toLowerCase().includes(q);
+    const mf=invFilter==='ALL'||(invFilter==='WARN'?hasWarn(item):item.grade===invFilter);
+    return ms&&mf;
+  });
+  const total=list.length, shown=list.slice(0,invPage*PAGE);
+  document.getElementById('inv-list').innerHTML=shown.map(item=>{
+    const w=item.sub_materials.filter(s=>s.stock<=0).length;
+    const l=item.sub_materials.filter(s=>s.stock>0&&s.stock<s.safety_stock).length;
+    const rc=w>0?'warn':l>0?'low':'';
+    const wdot=w>0?`<div class="inv-warn-dot"></div>`:'';
+    return `<div class="inv-row ${rc}" onclick="selectItem('${item.barcode}')">
+      <div class="gdot d${item.grade}"></div>
+      <div class="inv-info">
+        <div class="inv-name">${item.name}</div>
+        <div class="inv-meta">${item.vendor} · ${item.slot} · ${item.category}</div>
+      </div>
+      ${wdot}
+      <div class="inv-sub-count">${item.sub_materials.length}종<br><span style="font-size:9px">${w>0?`🔴${w}부족`:l>0?`🟡${l}주의`:''}</span></div>
+    </div>`;
+  }).join('');
+  document.getElementById('page-info').textContent=`${Math.min(shown.length,total)} / ${total}개`;
+  document.getElementById('load-more').style.display=shown.length>=total?'none':'block';
+}
+function loadMore(){invPage++;renderInv();}
+function selectItem(bc){const item=data.find(d=>d.barcode===bc);if(item){switchTab('scan');document.getElementById('barcode-input').value=bc;showProduct(item);window.scrollTo(0,0);}}
+
+// ===== AUDIT =====
+function renderAudit(){
+  const al=document.getElementById('audit-list');
+  const ml=document.getElementById('mm-list');
+  if(!auditLog.length){al.innerHTML='<div style="color:var(--text2);text-align:center;padding:22px;font-size:12px">아직 내역이 없습니다.</div>';}
+  else{
+    const cm={in:'at-in',out:'at-out',loss:'at-loss',fix:'at-fix',mismatch:'at-mm',zero_ok:'at-in'};
+    const lm={in:'입고',out:'출고',loss:'불량',fix:'보정',mismatch:'불일치',zero_ok:'영점OK',empty:'재고소진'};
+    al.innerHTML=auditLog.slice(0,40).map(a=>`<div class="audit-item">
+      <div class="audit-hdr"><span class="atype ${cm[a.type]||'at-fix'}">${lm[a.type]||a.type}</span><span class="atime">${a.time}</span></div>
+      <div class="aname">${a.product} (${a.slot})</div>
+      <div class="adetail">[${a.sub}] ${a.note} | ${a.qty>=0?'+':''}${a.qty}EA → 잔여 ${a.after}EA</div>
+    </div>`).join('');
+  }
+  if(!mmLog.length){ml.innerHTML='<div style="color:var(--text2);text-align:center;padding:22px;font-size:12px">불일치 내역 없음 </div>';}
+  else{
+    ml.innerHTML=mmLog.slice(0,20).map(m=>`<div class="audit-item" style="border-color:rgba(248,81,73,.4)">
+      <div class="audit-hdr"><span class="atype at-mm">불일치</span><span class="atime">${m.time}</span></div>
+      <div class="aname">${m.name} → [${m.sub}] (${m.slot})</div>
+      <div class="adetail" style="color:#f85149">${m.reason||''} ${m.qty!==undefined?'| 차감: -'+m.qty+'EA':''} ${m.diff!==undefined?'| 차이: '+m.diff+'EA':''}</div>
+    </div>`).join('');
+  }
+}
+</script>
+</body>
+</html>
